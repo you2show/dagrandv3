@@ -23,6 +23,21 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, './src'),
         }
+      },
+      // 👇 នេះគឺជាកូដដែលទើបតែបន្ថែមថ្មី ដើម្បីដោះស្រាយបញ្ហា Warning ទំហំ File JS 👇
+      build: {
+        chunkSizeWarningLimit: 1000, // បង្កើន limit កុំឲ្យលោត Warning
+        rollupOptions: {
+          output: {
+            manualChunks(id) {
+              // បំបែក File ធំចេញជាចំណែកតូចៗ ដើម្បីឲ្យវេបសាយដើរលឿន
+              if (id.includes('node_modules')) {
+                return id.toString().split('node_modules/')[1].split('/')[0].toString();
+              }
+            }
+          }
+        }
       }
+      // 👆 បញ្ចប់ការបន្ថែម 👆
     };
 });
