@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#153c63" />
+    <title>Dagrand Law Office</title>
+    <link rel="icon" href="https://raw.githubusercontent.com/icenterofficial/dagrand/refs/heads/main/public/assets/images/logo.png" />
+    <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/icenterofficial/dagrand/refs/heads/main/public/assets/images/logo.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="DAGRAND">
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Moul&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+    <!-- Netlify Identity Widget -->
+    <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+    <style>
+      html { scroll-behavior: smooth; }
+      body { font-family: 'Lato', sans-serif; color: #334155; }
+      h1, h2, h3, h4, h5, h6 { font-family: 'Playfair Display', serif; }
+      
+      /* --- Targeted Font Scaling Logic --- */
+      body.fs-large main p,
+      body.fs-large main li,
+      body.fs-large .prose p {
+        font-size: 1.15rem !important; 
+        line-height: 1.8 !important;
+      }
+      body.fs-xl main p,
+      body.fs-xl main li,
+      body.fs-xl .prose p {
+        font-size: 1.35rem !important; 
+        line-height: 1.9 !important;
+      }
+      
+      .glass-nav {
+        background: rgba(21, 60, 99, 0.95);
+        backdrop-filter: blur(10px);
+      }
+      .dark .glass-nav {
+        background: rgba(15, 43, 74, 0.95);
+      }
+      .preserve-3d {
+        transform-style: preserve-3d;
+      }
+      .perspective-1000 {
+        perspective: 1000px;
+      }
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #f1f1f1; 
+      }
+      .dark ::-webkit-scrollbar-track {
+        background: #1e293b;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #b49b67; 
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #153c63; 
+      }
+    </style>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('/sw.js').then(function(registration) {
+        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+      }, function(err) {
+        console.log('ServiceWorker registration failed: ', err);
+      });
+    });
+  }
+</script>
+</head>
+  <body class="bg-white dark:bg-brand-dark transition-colors duration-300">
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
