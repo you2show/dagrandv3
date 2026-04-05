@@ -1,5 +1,5 @@
 /* ១. ដាក់ Import Font នៅលើគេបង្អស់ */
-@import url('https://fonts.googleapis.com/css2?family=Moul&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Moul&amp;display=swap');
 
 /* ២. បន្ទាប់មកទើប Import Tailwind */
 @import "tailwindcss";
