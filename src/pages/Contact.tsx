@@ -2,12 +2,12 @@
 import React, { useState } from 'react';
 import { MapPin, Phone, Mail, Clock, Send, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useForm, ValidationError } from '@formspree/react';
 import { CONTACT_INFO } from '../../constants';
 import { PageHeader } from '../components/PageHeader';
 import { SEO } from '../components/SEO';
 import { useLanguage } from '../contexts/LanguageContext';
 import { toast } from 'sonner';
+import { supabase } from '../lib/supabaseClient';
 
 const MotionDiv = motion.div as any;
 
@@ -16,8 +16,8 @@ const Contact = () => {
   const address = getContent(CONTACT_INFO.address, CONTACT_INFO.address_cn);
   const hours = getContent(CONTACT_INFO.businessHours, CONTACT_INFO.businessHours_cn);
 
-  // Formspree Hook
-  const [state, handleSubmit] = useForm("info@dagrand.net"); // Using email directly for Formspree (requires verification)
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   // Local state for UI feedback if needed
   const [formData, setFormData] = useState({
@@ -31,7 +31,36 @@ const Contact = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  if (state.succeeded) {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    const data = new FormData(e.target as HTMLFormElement);
+    data.append('access_key', '9e3d89d5-56c0-482e-a374-1965a90dc66d');
+
+    try {
+        const response = await fetch("https://api.web3forms.com/submit", {
+            method: "POST",
+            body: data
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            setIsSuccess(true);
+            toast.success("Message sent successfully!");
+        } else {
+            throw new Error(result.message || "Failed to send message");
+        }
+    } catch (error: any) {
+        console.error("Error sending message:", error);
+        toast.error("There was an error sending your message. Please try again or contact us directly at " + CONTACT_INFO.email);
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
+
+  if (isSuccess) {
     return (
         <div className="bg-brand-gray dark:bg-brand-dark min-h-screen flex flex-col transition-colors duration-300">
             <PageHeader title={t('contact')} subtitle={t('contactSubtitle')} />
@@ -137,7 +166,6 @@ const Contact = () => {
                                 placeholder="John Doe" 
                                 required
                             />
-                            <ValidationError prefix="Name" field="name" errors={state.errors} className="text-red-500 text-xs mt-1" />
                         </div>
                         <div className="group">
                             <label htmlFor="email" className="block text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2">{t('emailAddress')}</label>
@@ -151,7 +179,6 @@ const Contact = () => {
                                 placeholder="email@example.com" 
                                 required
                             />
-                            <ValidationError prefix="Email" field="email" errors={state.errors} className="text-red-500 text-xs mt-1" />
                         </div>
                     </div>
                     <div className="group">
@@ -165,7 +192,6 @@ const Contact = () => {
                             className="w-full px-4 py-3 bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 focus:bg-white dark:focus:bg-white/10 text-brand-navy dark:text-white focus:border-brand-navy outline-none transition-all" 
                             placeholder="Legal Inquiry..." 
                         />
-                        <ValidationError prefix="Subject" field="subject" errors={state.errors} className="text-red-500 text-xs mt-1" />
                     </div>
                     <div className="group">
                         <label htmlFor="message" className="block text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2">{t('message')}</label>
@@ -179,21 +205,15 @@ const Contact = () => {
                             placeholder="How can we help you?"
                             required
                         ></textarea>
-                        <ValidationError prefix="Message" field="message" errors={state.errors} className="text-red-500 text-xs mt-1" />
                     </div>
                     <button 
                         type="submit"
-                        disabled={state.submitting}
+                        disabled={isSubmitting}
                         className="bg-brand-gold text-white font-bold py-4 px-8 uppercase tracking-widest text-sm hover:bg-brand-navy transition-all duration-300 w-full md:w-auto flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
-                        {state.submitting ? <Loader2 className="animate-spin h-4 w-4" /> : <Send className="h-4 w-4" />}
-                        {state.submitting ? 'Sending...' : t('sendBtn')}
+                        {isSubmitting ? <Loader2 className="animate-spin h-4 w-4" /> : <Send className="h-4 w-4" />}
+                        {isSubmitting ? 'Sending...' : t('sendBtn')}
                     </button>
-                    {state.errors && (
-                        <p className="text-red-500 text-sm mt-4">
-                            There was an error sending your message. Please try again or contact us directly at {CONTACT_INFO.email}.
-                        </p>
-                    )}
                 </form>
             </div>
         </MotionDiv>
