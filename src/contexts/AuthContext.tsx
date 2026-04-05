@@ -132,7 +132,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const { data } = supabase.auth.onAuthStateChange((_event, session) => {
                 if (session) {
                     const { user: sbUser } = session;
-                    const isAdminEmail = sbUser.email === 'mathyous5@gmail.com';
+                    const isAdminEmail = sbUser.email === 'mathyousos5@gmail.com';
                     setUser({
                         id: sbUser.id,
                         email: sbUser.email || '',
