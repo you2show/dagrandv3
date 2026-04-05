@@ -67,14 +67,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       try {
           // Fetch static JSON
           const res = await fetch('/data/users.json');
-          const data = await res.json();
-          if (data && data.users) {
-              // Merge fetched users, avoiding duplicates
-              data.users.forEach((fetchedUser: User) => {
-                  if (!allUsers.find(u => u.email === fetchedUser.email)) {
-                      allUsers.push(fetchedUser);
-                  }
-              });
+          const contentType = res.headers.get('content-type');
+          if (res.ok && contentType && contentType.includes('application/json')) {
+              const data = await res.json();
+              if (data && data.users) {
+                  // Merge fetched users, avoiding duplicates
+                  data.users.forEach((fetchedUser: User) => {
+                      if (!allUsers.find(u => u.email === fetchedUser.email)) {
+                          allUsers.push(fetchedUser);
+                      }
+                  });
+              }
           }
       } catch (err) {
           console.error("Failed to load mock users, using internal fallback:", err);
@@ -110,7 +113,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
             if (session) {
                const { user: sbUser } = session;
-               const isAdminEmail = sbUser.email === 'mathyous5@gmail.com';
+               const isAdminEmail = sbUser.email === 'mathyousos5@gmail.com';
                setUser({
                  id: sbUser.id,
                  email: sbUser.email || '',
