@@ -1,12 +1,4 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-
-// Declare Deno to avoid TypeScript errors in environments without Deno types
-declare const Deno: {
-  env: {
-    get(key: string): string | undefined;
-  };
-};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,64 +6,54 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight request
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { name, email, subject, message } = await req.json()
+    const formData = await req.json()
 
-    // Validate inputs
-    if (!name || !email || !message) {
-        throw new Error("Missing required fields");
-    }
+    const name = formData.name || formData.fullName || 'N/A'
+    const email = formData.email || 'N/A'
+    const phone = formData.phone || formData.phoneNumber || 'N/A'
+    const subject = formData.subject || 'N/A'
+    const message = formData.message || 'N/A'
 
-    const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN');
-    const chatId = Deno.env.get('TELEGRAM_CHAT_ID');
+    const TELEGRAM_BOT_TOKEN = "8729871717:AAFWwQ77BuHZytSbJk23Brzd75dzZLg5-Lg";
+    const TELEGRAM_CHAT_ID = "905513579";
 
-    if (!botToken || !chatId) {
-        throw new Error("Telegram configuration missing on server");
-    }
+    const text = `📩 <b>New Contact Message</b>\n\n👤 <b>Name:</b> ${name}\n📧 <b>Email:</b> ${email}\n📞 <b>Phone:</b> ${phone}\n📝 <b>Subject:</b> ${subject}\n💬 <b>Message:</b>\n${message}`;
 
-    // Construct the message for Telegram
-    const text = `
-📩 *New Contact Message*
-------------------------
-👤 *Name:* ${name}
-📧 *Email:* ${email}
-📝 *Subject:* ${subject || 'No Subject'}
-------------------------
-💬 *Message:*
-${message}
-    `;
-
-    // Send to Telegram
-    const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    const response = await fetch(telegramUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            chat_id: chatId,
-            text: text,
-            parse_mode: 'Markdown'
-        })
+    const telegramResponse = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        chat_id: TELEGRAM_CHAT_ID,
+        text: text,
+        parse_mode: 'HTML'
+      }),
     });
 
-    if (!response.ok) {
-        const errorData = await response.text();
-        throw new Error(`Telegram API Error: ${errorData}`);
+    if (!telegramResponse.ok) {
+      console.error("Failed to send telegram message", await telegramResponse.text());
     }
 
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    })
-
-  } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400,
-    })
+    return new Response(
+      JSON.stringify({ success: true, message: "Message sent successfully" }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      }
+    )
+  } catch (error) {
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      }
+    )
   }
 })
