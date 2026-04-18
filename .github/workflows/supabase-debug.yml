@@ -49,7 +49,7 @@ jobs:
           fi
 
           echo "Auth settings endpoint reachable (HTTP ${status})."
-          jq -r '{external_email_enabled, disable_signup} | @json' /tmp/auth-settings.json
+          node -e 'const fs=require("fs");const d=JSON.parse(fs.readFileSync("/tmp/auth-settings.json","utf8"));console.log(JSON.stringify({external_email_enabled:d.external_email_enabled,disable_signup:d.disable_signup}))'
 
       - name: Optional SQL connectivity check (read-only)
         if: ${{ inputs.run_db_query }}
