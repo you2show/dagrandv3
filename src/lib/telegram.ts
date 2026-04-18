@@ -8,22 +8,64 @@ export type TelegramContactPayload = {
   message: string;
 };
 
+const normalize = (value?: string) => value?.trim() || '';
+
 export const sendTelegramMessage = async (data: TelegramContactPayload) => {
   if (!supabase) {
     throw new Error('Contact service is unavailable right now.');
   }
 
-  const { data: result, error } = await supabase.functions.invoke('contact-form', {
-    body: data
-  });
+  const payload = {
+    name: normalize(data.name),
+    email: normalize(data.email),
+    phone: normalize(data.phone),
+    subject: normalize(data.subject),
+    message: normalize(data.message),
+  };
 
-  if (error) {
-    throw new Error(error.message || 'Failed to send Telegram message');
+  if (!payload.message) {
+    throw new Error('Message is required.');
   }
 
-  if (!result?.success) {
-    throw new Error(result?.error || 'Failed to send Telegram message');
+  const maxAttempts = 2;
+  let lastError = 'Failed to send Telegram message';
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const { data: result, error } = await supabase.functions.invoke('contact-form', {
+      body: payload
+    });
+
+    if (!error && result?.success) {
+      return result;
+    }
+
+    let message = lastError;
+
+    if (error) {
+      message = error.message || message;
+      const context = (error as { context?: Response }).context;
+      if (context) {
+        try {
+          const contextPayload = await context.clone().json();
+          if (typeof contextPayload?.error === 'string' && contextPayload.error.trim()) {
+            message = contextPayload.error.trim();
+          }
+        } catch {
+          // Keep fallback error message.
+        }
+      }
+    } else if (result && !result.success) {
+      message = result.error || message;
+    }
+
+    lastError = message;
+    const shouldRetry = /network|fetch|timeout|502|503|504|temporary|temporarily/i.test(message);
+    if (attempt < maxAttempts && shouldRetry) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      continue;
+    }
+    break;
   }
 
-  return result;
+  throw new Error(lastError);
 };

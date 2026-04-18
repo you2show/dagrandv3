@@ -141,7 +141,7 @@ const RichTextEditor = ({ value, onChange, placeholder }: { value: string, onCha
 };
 
 const Admin = () => {
-  const { isAuthenticated, login, logout, user, users: contextUsers, addUser, isLoading: authLoading, isMockMode } = useAuth();
+  const { isAuthenticated, login, logout, user, users: contextUsers, addUser, changePassword, isLoading: authLoading, isMockMode } = useAuth();
   const [activeTab, setActiveTab] = useState<'content' | 'team'>('content');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
@@ -202,8 +202,18 @@ const Admin = () => {
 
   const canEditArticle = (article: LegalUpdate) => {
       if (isAdmin) return true;
-      if (user && article.authorId === user.id) return true;
-      if (user && article.author?.name === user.name) return true;
+      if (!user) return false;
+      if (article.authorId === user.id) return true;
+      const author = (article as any).author;
+      if (author && typeof author === 'object' && author.id === user.id) return true;
+      if (typeof author === 'string') {
+          try {
+              const parsedAuthor = JSON.parse(author);
+              if (parsedAuthor?.id === user.id) return true;
+          } catch {
+              return false;
+          }
+      }
       return false;
   };
 
@@ -213,7 +223,21 @@ const Admin = () => {
       if (isMockMode || !supabase) return { error: "Mock Mode" };
 
       try {
-          // Use Database RPC instead of Edge Functions for easier setup
+          // Prefer Edge Function when available.
+          const { data: fnResult, error: fnError } = await supabase.functions.invoke('admin-actions', {
+              body: { action, payload }
+          });
+
+          if (!fnError) {
+              if (fnResult && typeof fnResult === 'object' && 'error' in fnResult && fnResult.error) {
+                  if (action !== 'listUsers' && action !== 'deleteUser') {
+                      return { error: String(fnResult.error) };
+                  }
+              } else {
+                  return fnResult;
+              }
+          }
+
           if (action === 'listUsers') {
               const { data, error } = await supabase.rpc('admin_get_team');
               if (error) throw error;
@@ -226,10 +250,8 @@ const Admin = () => {
               return { success: true };
           }
 
-          // For createUser and updateUser, we still recommend using Supabase Dashboard or Edge Function
-          // But we can fallback to a more helpful message
           if (action === 'updateUser' || action === 'createUser') {
-              return { error: `Action '${action}' requires Edge Function deployment. Please use Supabase Dashboard to manage users manually for now.` };
+              return { error: fnError.message || `Action '${action}' failed. Please check admin-actions function deployment and permissions.` };
           }
           throw new Error(`Action '${action}' is not supported.`);
       } catch (err: any) {
@@ -606,13 +628,21 @@ const Admin = () => {
 
   const handleChangePassword = async (e: React.FormEvent) => {
       e.preventDefault();
+      if (!passwordFormData.currentPassword.trim()) {
+          toast.error("Current password is required");
+          return;
+      }
+      if (passwordFormData.newPassword.length < 6) {
+          toast.error("New password must be at least 6 characters");
+          return;
+      }
       if (passwordFormData.newPassword !== passwordFormData.confirmPassword) {
           toast.error("Passwords do not match");
           return;
       }
       try {
-          const { error } = await supabase.auth.updateUser({ password: passwordFormData.newPassword });
-          if (error) throw error;
+          const result = await changePassword(passwordFormData.currentPassword, passwordFormData.newPassword);
+          if (!result.success) throw new Error(result.error || 'Failed to update password');
           toast.success("Password updated successfully");
           setIsPasswordModalOpen(false);
           setPasswordFormData({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -1498,6 +1528,7 @@ const Admin = () => {
                     <MotionDiv initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} className="bg-white w-full max-w-sm rounded-xl shadow-2xl relative z-10 p-6">
                         <h3 className="text-brand-navy font-serif font-bold text-xl mb-4">Change Password</h3>
                         <form onSubmit={handleChangePassword} className="space-y-4">
+                            <div className="space-y-1.5"><label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Current Password</label><input type="password" value={passwordFormData.currentPassword} onChange={e => setPasswordFormData({...passwordFormData, currentPassword: e.target.value})} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none" required /></div>
                             <div className="space-y-1.5"><label className="text-xs font-bold text-gray-500 uppercase tracking-widest">New Password</label><input type="password" value={passwordFormData.newPassword} onChange={e => setPasswordFormData({...passwordFormData, newPassword: e.target.value})} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none" required /></div>
                             <div className="space-y-1.5"><label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Confirm Password</label><input type="password" value={passwordFormData.confirmPassword} onChange={e => setPasswordFormData({...passwordFormData, confirmPassword: e.target.value})} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none" required /></div>
                             <div className="flex justify-end gap-2 pt-4">

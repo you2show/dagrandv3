@@ -31,6 +31,28 @@ const DEMO_USERS: User[] = [
     }
 ];
 
+// NOTE: This is only for mock-mode local persistence to avoid clear-text storage in browser state.
+// It is intentionally lightweight and is NOT a substitute for secure server-side password hashing.
+const hashPassword = (value: string) => {
+  let hash = 5381;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = ((hash << 5) + hash) + value.charCodeAt(i);
+  }
+  return `h$${(hash >>> 0).toString(16)}`;
+};
+
+const isPasswordMatch = (storedPassword: string | undefined, inputPassword: string) => {
+  if (!storedPassword) return false;
+  // Backward compatibility for old plain-text mock users.
+  if (!storedPassword.startsWith('h$')) return storedPassword === inputPassword;
+  return storedPassword === hashPassword(inputPassword);
+};
+
+const sanitizeSessionUser = (value: User): User => {
+  const { password, ...safeUser } = value;
+  return safeUser as User;
+};
+
 interface LoginResult {
   success: boolean;
   error?: string;
@@ -42,6 +64,7 @@ interface AuthContextType {
   login: (email: string, pass: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
   addUser: (user: User) => void; 
+  changePassword: (currentPassword: string, newPassword: string) => Promise<LoginResult>;
   isAuthenticated: boolean;
   isLoading: boolean;
   isMockMode: boolean; 
@@ -102,7 +125,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (mockMode) {
         // MOCK MODE: Load session from LocalStorage
         const savedSession = localStorage.getItem('dagrand_session');
-        if (savedSession) setUser(JSON.parse(savedSession));
+        if (savedSession) setUser(sanitizeSessionUser(JSON.parse(savedSession)));
       } else {
         try {
             // SUPABASE MODE: Check active session
@@ -124,8 +147,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             } else {
                 // Check if we have a persisted mock session even in real mode (Hybrid support)
                 const savedSession = localStorage.getItem('dagrand_session');
-                if (savedSession) setUser(JSON.parse(savedSession));
-            }
+                if (savedSession) setUser(sanitizeSessionUser(JSON.parse(savedSession)));
+             }
 
             // Listen for auth changes
             // @ts-ignore
@@ -152,7 +175,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             console.error("Supabase Connection Error:", error);
             // Fallback: treat as if disconnected/offline
             const savedSession = localStorage.getItem('dagrand_session');
-            if (savedSession) setUser(JSON.parse(savedSession));
+            if (savedSession) setUser(sanitizeSessionUser(JSON.parse(savedSession)));
         }
       }
     };
@@ -166,8 +189,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // --- ADD USER (PERSIST LOCAL) ---
   const addUser = (newUser: User) => {
+      const userToStore: User = {
+          ...newUser,
+          password: newUser.password ? hashPassword(newUser.password) : undefined
+      };
       setUsers(prev => {
-          const updated = [...prev, newUser];
+          const updated = [...prev, userToStore];
           // Persist only the custom added ones (simulate DB)
           const mockUsersToSave = updated.filter(u => u.password && !DEMO_USERS.find(d => d.email === u.email)); 
           localStorage.setItem('dagrand_users_list', JSON.stringify(mockUsersToSave));
@@ -200,10 +227,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // 2. Try Local/Mock Users Check (Fallback)
     // We trim and lowercase to ensure case-insensitivity consistency
-    const foundUser = users.find(u => u.email.trim().toLowerCase() === email.trim().toLowerCase() && u.password === pass);
+    const foundUser = users.find(
+      u => u.email.trim().toLowerCase() === email.trim().toLowerCase() && isPasswordMatch(u.password, pass)
+    );
     if (foundUser) {
-      setUser(foundUser);
-      localStorage.setItem('dagrand_session', JSON.stringify(foundUser));
+      const safeUser = sanitizeSessionUser(foundUser);
+      setUser(safeUser);
+      localStorage.setItem('dagrand_session', JSON.stringify(safeUser));
       return { success: true };
     }
 
@@ -231,8 +261,49 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(null);
   };
 
+  const changePassword = async (currentPassword: string, newPassword: string): Promise<LoginResult> => {
+    if (!user) return { success: false, error: 'User session not found' };
+
+    if (mockMode) {
+      const foundUser = users.find(u => u.id === user.id);
+      if (!foundUser) return { success: false, error: 'User not found' };
+      if (!isPasswordMatch(foundUser.password, currentPassword)) {
+        return { success: false, error: 'Current password is incorrect' };
+      }
+
+      const updatedUser = { ...foundUser, password: hashPassword(newPassword) };
+      setUsers(prev => {
+        const updatedUsers = prev.map(u => u.id === user.id ? updatedUser : u);
+        const mockUsersToSave = updatedUsers.filter(u => u.password && !DEMO_USERS.find(d => d.email === u.email));
+        localStorage.setItem('dagrand_users_list', JSON.stringify(mockUsersToSave));
+        return updatedUsers;
+      });
+      const safeUser = sanitizeSessionUser(updatedUser);
+      setUser(safeUser);
+      localStorage.setItem('dagrand_session', JSON.stringify(safeUser));
+      return { success: true };
+    }
+
+    try {
+      if (!supabase) return { success: false, error: 'Auth service unavailable' };
+      // Verify current password before allowing change.
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      });
+      if (verifyError) return { success: false, error: 'Current password is incorrect' };
+
+      const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateError) return { success: false, error: updateError.message };
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to update password' };
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, users, login, logout, addUser, isAuthenticated: !!user, isLoading, isMockMode: mockMode }}>
+    <AuthContext.Provider value={{ user, users, login, logout, addUser, changePassword, isAuthenticated: !!user, isLoading, isMockMode: mockMode }}>
       {children}
     </AuthContext.Provider>
   );
