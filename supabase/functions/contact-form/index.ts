@@ -1,26 +1,27 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
+const normalizeOrigin = (origin: string) => {
+  const normalized = origin.trim()
+  if (!normalized) return null
+  try {
+    return new URL(normalized).origin.toLowerCase()
+  } catch {
+    console.warn(`Ignoring invalid CORS origin: ${origin}`)
+    return null
+  }
+}
+
 const allowedOrigins = (Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '')
   .split(',')
-  .map((entry) => entry.trim())
-  .filter(Boolean)
-  .map((origin) => origin.toLowerCase())
-  .filter((origin) => {
-    try {
-      new URL(origin)
-      return true
-    } catch {
-      console.warn(`Ignoring invalid CORS origin: ${origin}`)
-      return false
-    }
-  })
+  .map((entry) => normalizeOrigin(entry))
+  .filter((origin): origin is string => Boolean(origin))
 
 if (allowedOrigins.length === 0) {
   console.warn('CORS_ALLOWED_ORIGINS is empty; contact-form will use wildcard CORS.')
 }
 
 const determineAllowedOrigin = (origin: string | null, origins: string[]) => {
-  const normalizedOrigin = origin?.toLowerCase() ?? null
+  const normalizedOrigin = origin ? normalizeOrigin(origin) : null
 
   if (origins.length === 0) {
     return normalizedOrigin ?? '*'
