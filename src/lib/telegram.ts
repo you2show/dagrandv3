@@ -41,10 +41,13 @@ export const sendTelegramMessage = async (data: TelegramContactPayload) => {
 
     let message = lastError;
 
+    let responseStatus: number | null = null;
+
     if (error) {
       message = error.message || message;
       const context = (error as { context?: Response }).context;
       if (context) {
+        responseStatus = context.status;
         try {
           const contextPayload = await context.clone().json();
           if (typeof contextPayload?.error === 'string' && contextPayload.error.trim()) {
@@ -60,12 +63,16 @@ export const sendTelegramMessage = async (data: TelegramContactPayload) => {
 
     const isEdgeRequestError =
       (error as { name?: string } | null)?.name === 'FunctionsFetchError';
+    const isRetryableStatus =
+      responseStatus !== null && [408, 409, 425, 429, 500, 502, 503, 504].includes(responseStatus);
+    const isRetryableMessage =
+      /network|fetch|timeout|502|503|504|temporary|temporarily|unavailable|try again|rate limit/i.test(message);
 
     lastError = isEdgeRequestError
       ? 'Delivery status is unknown because of a network response issue. Please retry once only if you did not receive confirmation.'
       : message;
     const shouldRetry =
-      isEdgeRequestError || /network|fetch|timeout|502|503|504|temporary|temporarily/i.test(message);
+      isEdgeRequestError || isRetryableStatus || isRetryableMessage;
     if (attempt < maxAttempts && shouldRetry) {
       await new Promise((resolve) => setTimeout(resolve, 500));
       continue;
