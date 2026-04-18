@@ -59,8 +59,7 @@ export const sendTelegramMessage = async (data: TelegramContactPayload) => {
     }
 
     const isEdgeRequestError =
-      (error as { name?: string } | null)?.name === 'FunctionsFetchError' ||
-      /Failed to send a request to the Edge Function/i.test(message);
+      (error as { name?: string } | null)?.name === 'FunctionsFetchError';
 
     if (isEdgeRequestError) {
       throw new Error(
@@ -69,7 +68,7 @@ export const sendTelegramMessage = async (data: TelegramContactPayload) => {
     }
 
     lastError = message;
-    const shouldRetry = /timeout|502|503|504|temporary|temporarily/i.test(message);
+    const shouldRetry = /network|fetch|timeout|502|503|504|temporary|temporarily/i.test(message);
     if (attempt < maxAttempts && shouldRetry) {
       await new Promise((resolve) => setTimeout(resolve, 500));
       continue;
