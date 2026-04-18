@@ -4,6 +4,7 @@ const allowedOrigins = (Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '')
   .split(',')
   .map((entry) => entry.trim())
   .filter(Boolean)
+  .map((origin) => origin.toLowerCase())
   .filter((origin) => {
     try {
       new URL(origin)
@@ -19,12 +20,14 @@ if (allowedOrigins.length === 0) {
 }
 
 const determineAllowedOrigin = (origin: string | null, origins: string[]) => {
+  const normalizedOrigin = origin?.toLowerCase() ?? null
+
   if (origins.length === 0) {
-    return origin ?? '*'
+    return normalizedOrigin ?? '*'
   }
 
-  if (origin && origins.includes(origin)) {
-    return origin
+  if (normalizedOrigin && origins.includes(normalizedOrigin)) {
+    return normalizedOrigin
   }
 
   return null

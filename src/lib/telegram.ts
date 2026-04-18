@@ -63,7 +63,7 @@ export const sendTelegramMessage = async (data: TelegramContactPayload) => {
 
     if (isEdgeRequestError) {
       throw new Error(
-        'Unable to confirm message delivery because of a network response issue. Please retry once if needed.'
+        'Delivery status is unknown because of a network response issue. Please retry once only if you did not receive confirmation.'
       );
     }
 
