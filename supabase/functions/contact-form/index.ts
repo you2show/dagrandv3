@@ -14,7 +14,9 @@ serve(async (req) => {
   const allowOrigin =
     origin && (allowedOrigins.length === 0 || allowedOrigins.includes(origin))
       ? origin
-      : allowedOrigins[0] ?? '*'
+      : allowedOrigins.length === 0
+        ? '*'
+        : 'null'
   const corsHeaders = {
     'Access-Control-Allow-Origin': allowOrigin,
     'Vary': 'Origin',
