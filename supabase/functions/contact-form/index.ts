@@ -2,8 +2,16 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 serve(async (req) => {
   const origin = req.headers.get('origin')
+  const allowedOrigins = (Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+  const allowOrigin =
+    origin && (allowedOrigins.length === 0 || allowedOrigins.includes(origin))
+      ? origin
+      : allowedOrigins[0] ?? '*'
   const corsHeaders = {
-    'Access-Control-Allow-Origin': origin ?? '*',
+    'Access-Control-Allow-Origin': allowOrigin,
     'Vary': 'Origin',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',

@@ -64,7 +64,7 @@ export const sendTelegramMessage = async (data: TelegramContactPayload) => {
 
     if (isEdgeFetchError) {
       throw new Error(
-        'Your message may already be delivered, but we could not verify the response from the server. Please check Telegram and avoid submitting repeatedly.'
+        'We could not verify the server response. To avoid duplicate delivery, please wait a moment before trying again.'
       );
     }
 
