@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
-import { Mail, Phone, MapPin, Send } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, Clock } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { PageTransition } from '../components/PageTransition';
 import { sendTelegramMessage } from '../lib/telegram';
+import { CONTACT_INFO } from '../constants';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function Contact() {
+  const { t, getContent } = useLanguage();
+  const address = getContent(CONTACT_INFO.address, CONTACT_INFO.address_cn);
+  const businessHours = getContent(CONTACT_INFO.businessHours, CONTACT_INFO.businessHours_cn);
   const [formData, setFormData] = useState({
-    name: '',
+    fullName: '',
     email: '',
-    phone: '',
     subject: '',
     message: ''
   });
@@ -26,13 +30,19 @@ export default function Contact() {
     setError('');
 
     try {
-      await sendTelegramMessage(formData);
+      await sendTelegramMessage({
+        name: formData.fullName.trim(),
+        email: formData.email.trim(),
+        subject: formData.subject.trim(),
+        message: formData.message.trim()
+      });
       setSuccess(true);
-      setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
+      setFormData({ fullName: '', email: '', subject: '', message: '' });
       setTimeout(() => setSuccess(false), 5000);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error sending message:', err);
-      setError('Failed to send message. Please try again.');
+      const message = err instanceof Error ? err.message : 'Failed to send message. Please try again.';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -41,46 +51,64 @@ export default function Contact() {
   return (
     <PageTransition>
       <SEO title="Contact Us" description="Get in touch with our legal team." />
-      <div className="py-20 bg-gray-50 dark:bg-gray-900 min-h-screen pt-32">
+      <div className="py-20 bg-brand-gray dark:bg-brand-dark min-h-screen pt-32">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">Contact Us</h1>
-            <p className="text-lg text-gray-600 dark:text-gray-300">Get in touch with our legal team today.</p>
-          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 shadow-xl overflow-hidden">
+            <div className="lg:col-span-5 bg-brand-navy text-white p-10 md:p-12">
+              <h2 className="text-4xl font-serif font-bold mb-6">{t('getInTouchTitle')}</h2>
+              <p className="text-white/85 text-xl leading-relaxed mb-12">
+                {t('consultationAvail')}
+              </p>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 h-fit">
-              <h2 className="text-2xl font-semibold mb-6 text-gray-900 dark:text-white">Our Office</h2>
-              <div className="space-y-6">
-                <div className="flex items-start">
-                  <MapPin className="w-6 h-6 text-blue-600 mt-1 mr-4" />
+              <div className="space-y-10">
+                <div className="flex items-start gap-5">
+                  <MapPin className="w-7 h-7 text-brand-gold mt-1 shrink-0" />
                   <div>
-                    <h3 className="font-medium text-gray-900 dark:text-white">Address</h3>
-                    <p className="text-gray-600 dark:text-gray-300">Phnom Penh, Cambodia</p>
+                    <h3 className="font-serif text-4 font-bold mb-2">{t('ourOffice')}</h3>
+                    <p className="text-white/80 leading-relaxed">{address}</p>
                   </div>
                 </div>
-                <div className="flex items-start">
-                  <Phone className="w-6 h-6 text-blue-600 mt-1 mr-4" />
+
+                <div className="flex items-start gap-5">
+                  <Clock className="w-7 h-7 text-brand-gold mt-1 shrink-0" />
                   <div>
-                    <h3 className="font-medium text-gray-900 dark:text-white">Phone</h3>
-                    <p className="text-gray-600 dark:text-gray-300">+855 98 539 910</p>
+                    <h3 className="font-serif text-4 font-bold mb-2">{t('businessHours')}</h3>
+                    <p className="text-white/80">{businessHours}</p>
                   </div>
                 </div>
-                <div className="flex items-start">
-                  <Mail className="w-6 h-6 text-blue-600 mt-1 mr-4" />
+
+                <div className="flex items-start gap-5">
+                  <Phone className="w-7 h-7 text-brand-gold mt-1 shrink-0" />
                   <div>
-                    <h3 className="font-medium text-gray-900 dark:text-white">Email</h3>
-                    <p className="text-gray-600 dark:text-gray-300">info@dagrandv3.com</p>
+                    <h3 className="font-serif text-4 font-bold mb-2">{t('phone')}</h3>
+                    <div className="space-y-2">
+                      {CONTACT_INFO.phones.map((phone) => (
+                        <p key={phone.number} className="text-white/80">
+                          {phone.number}
+                          <span className="text-white/65 ml-2">({phone.label})</span>
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-5">
+                  <Mail className="w-7 h-7 text-brand-gold mt-1 shrink-0" />
+                  <div>
+                    <h3 className="font-serif text-4 font-bold mb-2">{t('email')}</h3>
+                    <a href={`mailto:${CONTACT_INFO.email}`} className="text-white/80 hover:text-white transition-colors">
+                      {CONTACT_INFO.email}
+                    </a>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
-              <h2 className="text-2xl font-semibold mb-6 text-gray-900 dark:text-white">Send a Message</h2>
-              
+            <div className="lg:col-span-7 bg-[#ececec] dark:bg-gray-800 p-10 md:p-12">
+              <h2 className="text-5xl font-serif font-bold mb-10 text-brand-navy dark:text-white">{t('sendMessage')}</h2>
+
               {success && (
-                <div className="mb-6 p-4 bg-green-50 text-green-700 rounded-md">
+                <div className="mb-6 p-4 bg-green-50 text-green-700 rounded-md border border-green-200">
                   Message sent successfully! We will contact you soon.
                 </div>
               )}
@@ -91,33 +119,27 @@ export default function Contact() {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
-                    <input type="text" name="name" required value={formData.name} onChange={handleChange} className="w-full px-4 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" />
+                    <label className="block text-sm font-bold tracking-widest uppercase text-gray-600 dark:text-gray-300 mb-2">{t('fullName')}</label>
+                    <input type="text" name="fullName" required value={formData.fullName} onChange={handleChange} className="w-full px-5 py-4 border border-gray-300 bg-[#f3f3f3] text-gray-700 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-brand-navy focus:border-brand-navy" placeholder="John Doe" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
-                    <input type="email" name="email" required value={formData.email} onChange={handleChange} className="w-full px-4 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone</label>
-                    <input type="tel" name="phone" value={formData.phone} onChange={handleChange} className="w-full px-4 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Subject</label>
-                    <input type="text" name="subject" required value={formData.subject} onChange={handleChange} className="w-full px-4 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" />
+                    <label className="block text-sm font-bold tracking-widest uppercase text-gray-600 dark:text-gray-300 mb-2">{t('emailAddress')}</label>
+                    <input type="email" name="email" required value={formData.email} onChange={handleChange} className="w-full px-5 py-4 border border-gray-300 bg-[#f3f3f3] text-gray-700 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-brand-navy focus:border-brand-navy" placeholder="email@example.com" />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Message</label>
-                  <textarea name="message" required rows={4} value={formData.message} onChange={handleChange} className="w-full px-4 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500"></textarea>
+                  <label className="block text-sm font-bold tracking-widest uppercase text-gray-600 dark:text-gray-300 mb-2">{t('subject')}</label>
+                  <input type="text" name="subject" required value={formData.subject} onChange={handleChange} className="w-full px-5 py-4 border border-gray-300 bg-[#f3f3f3] text-gray-700 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-brand-navy focus:border-brand-navy" placeholder="Legal Inquiry..." />
                 </div>
-                <button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-md flex items-center justify-center transition-colors disabled:opacity-50">
-                  {loading ? 'Sending...' : <><Send className="w-5 h-5 mr-2" /> Send Message</>}
+                <div>
+                  <label className="block text-sm font-bold tracking-widest uppercase text-gray-600 dark:text-gray-300 mb-2">{t('message')}</label>
+                  <textarea name="message" required rows={7} value={formData.message} onChange={handleChange} className="w-full px-5 py-4 border border-gray-300 bg-[#f3f3f3] text-gray-700 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-brand-navy focus:border-brand-navy" placeholder="How can we help you?" />
+                </div>
+                <button type="submit" disabled={loading} className="inline-flex items-center justify-center bg-brand-gold hover:bg-brand-goldLight text-white font-bold py-4 px-10 tracking-wider uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                  {loading ? 'Sending...' : <><Send className="w-5 h-5 mr-3" /> {t('sendBtn')}</>}
                 </button>
               </form>
             </div>
