@@ -1,0 +1,66 @@
+name: Supabase Debug Check
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_db_query:
+        description: "Run SQL check via SUPABASE_DB_URL (optional)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  supabase-debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+    steps:
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${SUPABASE_URL:-}" ]]; then
+            echo "Missing required secret: SUPABASE_URL" >&2
+            exit 1
+          fi
+          if [[ -z "${SUPABASE_ANON_KEY:-}" ]]; then
+            echo "Missing required secret: SUPABASE_ANON_KEY" >&2
+            exit 1
+          fi
+          echo "Required secrets are present."
+
+      - name: Check Supabase auth settings (read-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$(curl --silent --show-error --output /tmp/auth-settings.json --write-out "%{http_code}" \
+            --header "apikey: ${SUPABASE_ANON_KEY}" \
+            "${SUPABASE_URL}/auth/v1/settings")"
+
+          if [[ "${status}" != "200" ]]; then
+            echo "Auth settings check failed with HTTP ${status}" >&2
+            exit 1
+          fi
+
+          echo "Auth settings endpoint reachable (HTTP ${status})."
+          jq -r '{external_email_enabled, disable_signup} | @json' /tmp/auth-settings.json
+
+      - name: Optional SQL connectivity check (read-only)
+        if: ${{ inputs.run_db_query }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${SUPABASE_DB_URL:-}" ]]; then
+            echo "run_db_query=true but SUPABASE_DB_URL is missing." >&2
+            exit 1
+          fi
+
+          psql "${SUPABASE_DB_URL}" \
+            -v ON_ERROR_STOP=1 \
+            -c "select current_database() as database, current_user as user, now() as server_time;"
