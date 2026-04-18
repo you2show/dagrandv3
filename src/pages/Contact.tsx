@@ -162,7 +162,7 @@ export default function Contact() {
           loading="lazy"
           referrerPolicy="no-referrer-when-downgrade"
         />
-        <div className="absolute top-8 right-4 md:right-10 bg-white p-6 shadow-2xl max-w-sm border-l-4 border-brand-navy">
+        <div className="absolute top-8 left-4 right-4 md:left-auto md:right-10 bg-white p-6 shadow-2xl md:max-w-sm border-l-4 border-brand-navy">
           <h3 className="text-2xl font-serif font-bold text-brand-navy mb-3">{t('visitOffice')}</h3>
           <p className="text-gray-700 leading-relaxed mb-4 text-sm md:text-base">{address}</p>
           <a
