@@ -20,11 +20,21 @@ serve(async (req) => {
     const message = formData.message || 'N/A'
 
     const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN")
-    const TELEGRAM_CHAT_ID = Deno.env.get("TELEGRAM_CHAT_ID") || "905513579"
+    const TELEGRAM_CHAT_ID = Deno.env.get("TELEGRAM_CHAT_ID")
 
     if (!TELEGRAM_BOT_TOKEN) {
       return new Response(
         JSON.stringify({ success: false, error: "TELEGRAM_BOT_TOKEN is not configured" }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      )
+    }
+
+    if (!TELEGRAM_CHAT_ID) {
+      return new Response(
+        JSON.stringify({ success: false, error: "TELEGRAM_CHAT_ID is not configured" }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 500,
@@ -67,7 +77,7 @@ serve(async (req) => {
       const telegramError = await telegramResponse.text()
       console.error("Failed to send telegram message", telegramError);
       return new Response(
-        JSON.stringify({ success: false, error: "Failed to send telegram message", details: telegramError }),
+        JSON.stringify({ success: false, error: "Failed to send telegram message" }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 502,
