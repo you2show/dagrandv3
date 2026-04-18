@@ -42,6 +42,7 @@ interface AuthContextType {
   login: (email: string, pass: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
   addUser: (user: User) => void; 
+  changePassword: (currentPassword: string, newPassword: string) => Promise<LoginResult>;
   isAuthenticated: boolean;
   isLoading: boolean;
   isMockMode: boolean; 
@@ -231,8 +232,49 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(null);
   };
 
+  const changePassword = async (currentPassword: string, newPassword: string): Promise<LoginResult> => {
+    if (!user) return { success: false, error: 'User session not found' };
+
+    if (mockMode) {
+      const foundUser = users.find(u => u.id === user.id);
+      if (!foundUser) return { success: false, error: 'User not found' };
+      if ((foundUser.password || '') !== currentPassword) {
+        return { success: false, error: 'Current password is incorrect' };
+      }
+
+      const updatedUser = { ...foundUser, password: newPassword };
+      setUsers(prev => prev.map(u => u.id === user.id ? updatedUser : u));
+      setUser(updatedUser);
+      localStorage.setItem('dagrand_session', JSON.stringify(updatedUser));
+
+      // Persist local/mock custom users for next login.
+      const updatedUsers = users.map(u => u.id === user.id ? updatedUser : u);
+      const mockUsersToSave = updatedUsers.filter(u => u.password && !DEMO_USERS.find(d => d.email === u.email));
+      localStorage.setItem('dagrand_users_list', JSON.stringify(mockUsersToSave));
+      return { success: true };
+    }
+
+    try {
+      // Verify current password before allowing change.
+      // @ts-ignore
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      });
+      if (verifyError) return { success: false, error: 'Current password is incorrect' };
+
+      // @ts-ignore
+      const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateError) return { success: false, error: updateError.message };
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to update password' };
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, users, login, logout, addUser, isAuthenticated: !!user, isLoading, isMockMode: mockMode }}>
+    <AuthContext.Provider value={{ user, users, login, logout, addUser, changePassword, isAuthenticated: !!user, isLoading, isMockMode: mockMode }}>
       {children}
     </AuthContext.Provider>
   );
