@@ -1,11 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
+const allowedOrigins = (Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '')
+  .split(',')
+  .map((entry) => entry.trim())
+  .filter(Boolean)
+
+if (allowedOrigins.length === 0) {
+  console.warn('CORS_ALLOWED_ORIGINS is empty; contact-form will use wildcard CORS.')
+}
+
 serve(async (req) => {
   const origin = req.headers.get('origin')
-  const allowedOrigins = (Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '')
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter(Boolean)
   const allowOrigin =
     origin && (allowedOrigins.length === 0 || allowedOrigins.includes(origin))
       ? origin
