@@ -58,6 +58,15 @@ export const sendTelegramMessage = async (data: TelegramContactPayload) => {
       message = result.error || message;
     }
 
+    const isEdgeRequestError =
+      (error as { name?: string } | null)?.name === 'FunctionsFetchError';
+
+    if (isEdgeRequestError) {
+      throw new Error(
+        'Delivery status is unknown because of a network response issue. Please retry once only if you did not receive confirmation.'
+      );
+    }
+
     lastError = message;
     const shouldRetry = /network|fetch|timeout|502|503|504|temporary|temporarily/i.test(message);
     if (attempt < maxAttempts && shouldRetry) {

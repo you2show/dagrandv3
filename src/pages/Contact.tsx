@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Mail, Phone, MapPin, Send, Clock } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { toast } from 'sonner';
 import { SEO } from '../components/SEO';
 import { PageTransition } from '../components/PageTransition';
 import { sendTelegramMessage } from '../lib/telegram';
@@ -17,8 +19,6 @@ export default function Contact() {
     message: ''
   });
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState('');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -26,8 +26,8 @@ export default function Contact() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
-    setError('');
 
     try {
       await sendTelegramMessage({
@@ -36,13 +36,52 @@ export default function Contact() {
         subject: formData.subject.trim(),
         message: formData.message.trim()
       });
-      setSuccess(true);
+      toast.custom(
+        () => (
+          <motion.div
+            initial={{ opacity: 0, y: -12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            role="status"
+            aria-live="polite"
+            className="w-full max-w-md rounded-md border border-brand-gold/70 bg-brand-navy px-4 py-3 shadow-xl"
+          >
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="mt-0.5 h-5 w-5 text-brand-gold" />
+              <div>
+                <p className="font-serif text-base font-bold tracking-wide text-white">Message sent successfully</p>
+                <p className="mt-1 text-sm text-white/80">Thank you. Our legal team will contact you shortly.</p>
+              </div>
+            </div>
+          </motion.div>
+        ),
+        { duration: 4200 }
+      );
       setFormData({ fullName: '', email: '', subject: '', message: '' });
-      setTimeout(() => setSuccess(false), 5000);
     } catch (err: unknown) {
       console.error('Error sending message:', err);
       const message = err instanceof Error ? err.message : 'Failed to send message. Please try again.';
-      setError(message);
+      toast.custom(
+        () => (
+          <motion.div
+            initial={{ opacity: 0, y: -12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            role="alert"
+            aria-live="assertive"
+            className="w-full max-w-md rounded-md border border-red-300 bg-white px-4 py-3 shadow-xl"
+          >
+            <div className="flex items-start gap-3">
+              <AlertCircle className="mt-0.5 h-5 w-5 text-red-600" />
+              <div>
+                <p className="font-serif text-base font-bold tracking-wide text-brand-navy">Failed to send message</p>
+                <p className="mt-1 text-sm text-gray-700">{message}</p>
+              </div>
+            </div>
+          </motion.div>
+        ),
+        { duration: 5000 }
+      );
     } finally {
       setLoading(false);
     }
@@ -114,18 +153,6 @@ export default function Contact() {
 
             <div className="lg:col-span-7 bg-[#ececec] dark:bg-gray-800 p-8 md:p-10">
               <h2 className="text-4xl md:text-5xl font-serif font-bold mb-8 text-brand-navy dark:text-white">{t('sendMessage')}</h2>
-
-              {success && (
-                <div className="mb-6 p-4 bg-green-50 text-green-700 rounded-md border border-green-200">
-                  Message sent successfully! We will contact you soon.
-                </div>
-              )}
-
-              {error && (
-                <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-md">
-                  {error}
-                </div>
-              )}
 
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">

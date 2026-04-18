@@ -1,13 +1,66 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+const allowedOrigins = (Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '')
+  .split(',')
+  .map((entry) => entry.trim())
+  .filter(Boolean)
+  .map((origin) => origin.toLowerCase())
+  .filter((origin) => {
+    try {
+      new URL(origin)
+      return true
+    } catch {
+      console.warn(`Ignoring invalid CORS origin: ${origin}`)
+      return false
+    }
+  })
+
+if (allowedOrigins.length === 0) {
+  console.warn('CORS_ALLOWED_ORIGINS is empty; contact-form will use wildcard CORS.')
+}
+
+const determineAllowedOrigin = (origin: string | null, origins: string[]) => {
+  const normalizedOrigin = origin?.toLowerCase() ?? null
+
+  if (origins.length === 0) {
+    return normalizedOrigin ?? '*'
+  }
+
+  if (normalizedOrigin && origins.includes(normalizedOrigin)) {
+    return normalizedOrigin
+  }
+
+  return null
 }
 
 serve(async (req) => {
+  const origin = req.headers.get('origin')
+  const allowOrigin = determineAllowedOrigin(origin, allowedOrigins)
+  const corsHeaders: Record<string, string> = {
+    'Vary': 'Origin',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Max-Age': '86400',
+  }
+  if (allowOrigin) {
+    corsHeaders['Access-Control-Allow-Origin'] = allowOrigin
+  }
+
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    if (!allowOrigin) {
+      return new Response(null, { status: 403, headers: { 'Vary': 'Origin' } })
+    }
+    return new Response(null, { headers: corsHeaders, status: 204 })
+  }
+
+  if (!allowOrigin) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Origin not allowed' }),
+      {
+        headers: { 'Content-Type': 'application/json', 'Vary': 'Origin' },
+        status: 403,
+      }
+    )
   }
 
   try {
