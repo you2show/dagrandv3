@@ -64,7 +64,7 @@ export default function Contact() {
                 <div className="flex items-start gap-5">
                   <MapPin className="w-7 h-7 text-brand-gold mt-1 shrink-0" />
                   <div>
-                    <h3 className="font-serif text-4 font-bold mb-2">{t('ourOffice')}</h3>
+                    <h3 className="font-serif text-2xl font-bold mb-2">{t('ourOffice')}</h3>
                     <p className="text-white/80 leading-relaxed">{address}</p>
                   </div>
                 </div>
@@ -72,7 +72,7 @@ export default function Contact() {
                 <div className="flex items-start gap-5">
                   <Clock className="w-7 h-7 text-brand-gold mt-1 shrink-0" />
                   <div>
-                    <h3 className="font-serif text-4 font-bold mb-2">{t('businessHours')}</h3>
+                    <h3 className="font-serif text-2xl font-bold mb-2">{t('businessHours')}</h3>
                     <p className="text-white/80">{businessHours}</p>
                   </div>
                 </div>
@@ -80,7 +80,7 @@ export default function Contact() {
                 <div className="flex items-start gap-5">
                   <Phone className="w-7 h-7 text-brand-gold mt-1 shrink-0" />
                   <div>
-                    <h3 className="font-serif text-4 font-bold mb-2">{t('phone')}</h3>
+                    <h3 className="font-serif text-2xl font-bold mb-2">{t('phone')}</h3>
                     <div className="space-y-2">
                       {CONTACT_INFO.phones.map((phone) => (
                         <p key={phone.number} className="text-white/80">
@@ -95,7 +95,7 @@ export default function Contact() {
                 <div className="flex items-start gap-5">
                   <Mail className="w-7 h-7 text-brand-gold mt-1 shrink-0" />
                   <div>
-                    <h3 className="font-serif text-4 font-bold mb-2">{t('email')}</h3>
+                    <h3 className="font-serif text-2xl font-bold mb-2">{t('email')}</h3>
                     <a href={`mailto:${CONTACT_INFO.email}`} className="text-white/80 hover:text-white transition-colors">
                       {CONTACT_INFO.email}
                     </a>
