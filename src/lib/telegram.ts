@@ -58,8 +58,18 @@ export const sendTelegramMessage = async (data: TelegramContactPayload) => {
       message = result.error || message;
     }
 
+    const isEdgeFetchError =
+      (error as { name?: string } | null)?.name === 'FunctionsFetchError' ||
+      /Failed to send a request to the Edge Function/i.test(message);
+
+    if (isEdgeFetchError) {
+      throw new Error(
+        'Your message may already be delivered, but we could not verify the response from the server. Please check Telegram and avoid submitting repeatedly.'
+      );
+    }
+
     lastError = message;
-    const shouldRetry = /network|fetch|timeout|502|503|504|temporary|temporarily/i.test(message);
+    const shouldRetry = /timeout|502|503|504|temporary|temporarily/i.test(message);
     if (attempt < maxAttempts && shouldRetry) {
       await new Promise((resolve) => setTimeout(resolve, 500));
       continue;
