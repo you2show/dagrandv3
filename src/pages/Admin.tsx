@@ -218,7 +218,15 @@ const Admin = () => {
               body: { action, payload }
           });
 
-          if (!fnError) return fnResult;
+          if (!fnError) {
+              if (fnResult && typeof fnResult === 'object' && 'error' in fnResult && fnResult.error) {
+                  if (action !== 'listUsers' && action !== 'deleteUser') {
+                      return { error: String(fnResult.error) };
+                  }
+              } else {
+                  return fnResult;
+              }
+          }
 
           if (action === 'listUsers') {
               const { data, error } = await supabase.rpc('admin_get_team');

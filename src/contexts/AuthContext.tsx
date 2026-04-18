@@ -31,6 +31,8 @@ const DEMO_USERS: User[] = [
     }
 ];
 
+// NOTE: This is only for mock-mode local persistence to avoid clear-text storage in browser state.
+// It is intentionally lightweight and is NOT a substitute for secure server-side password hashing.
 const hashPassword = (value: string) => {
   let hash = 5381;
   for (let i = 0; i < value.length; i += 1) {
