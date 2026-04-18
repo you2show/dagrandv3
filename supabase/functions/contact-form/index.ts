@@ -20,20 +20,6 @@ if (allowedOrigins.length === 0) {
   console.warn('CORS_ALLOWED_ORIGINS is empty; contact-form will use wildcard CORS.')
 }
 
-const determineAllowedOrigin = (origin: string | null, origins: string[]) => {
-  const normalizedOrigin = origin ? normalizeOrigin(origin) : null
-
-  if (origins.length === 0) {
-    return normalizedOrigin ?? '*'
-  }
-
-  if (normalizedOrigin && origins.includes(normalizedOrigin)) {
-    return normalizedOrigin
-  }
-
-  return null
-}
-
 const TELEGRAM_TIMEOUT_MS = 8000
 const TELEGRAM_MAX_ATTEMPTS = 3
 const TELEGRAM_BASE_BACKOFF_MS = 500
@@ -95,29 +81,34 @@ const parseTelegramError = async (response: Response) => {
 
 serve(async (req) => {
   const origin = req.headers.get('origin')
-  const allowOrigin = determineAllowedOrigin(origin, allowedOrigins)
+  const normalizedOrigin = origin ? normalizeOrigin(origin) : null
+  const allowOriginHeader =
+    normalizedOrigin ?? (allowedOrigins.length === 0 ? '*' : null)
+  const isOriginAllowed =
+    allowedOrigins.length === 0 ||
+    (normalizedOrigin !== null && allowedOrigins.includes(normalizedOrigin))
   const corsHeaders: Record<string, string> = {
     'Vary': 'Origin',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Max-Age': '86400',
   }
-  if (allowOrigin) {
-    corsHeaders['Access-Control-Allow-Origin'] = allowOrigin
+  if (allowOriginHeader) {
+    corsHeaders['Access-Control-Allow-Origin'] = allowOriginHeader
   }
 
   if (req.method === 'OPTIONS') {
-    if (!allowOrigin) {
+    if (!allowOriginHeader) {
       return new Response(null, { status: 403, headers: { 'Vary': 'Origin' } })
     }
     return new Response(null, { headers: corsHeaders, status: 204 })
   }
 
-  if (!allowOrigin) {
+  if (!isOriginAllowed) {
     return new Response(
       JSON.stringify({ success: false, error: 'Origin not allowed' }),
       {
-        headers: { 'Content-Type': 'application/json', 'Vary': 'Origin' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 403,
       }
     )
