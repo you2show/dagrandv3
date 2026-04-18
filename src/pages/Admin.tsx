@@ -65,7 +65,16 @@ const RichTextEditor = ({ value, onChange, placeholder }: { value: string, onCha
         const text = e.clipboardData.getData('text/plain');
         const pastedContent = html || text;
         const sanitized = sanitizeEditorHtml(pastedContent);
-        document.execCommand('insertHTML', false, sanitized);
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+            const fragment = range.createContextualFragment(sanitized);
+            range.insertNode(fragment);
+            range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
         if (editorRef.current) {
             onChange(sanitizeEditorHtml(editorRef.current.innerHTML));
         }

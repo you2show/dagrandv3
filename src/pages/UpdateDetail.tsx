@@ -249,7 +249,7 @@ const UpdateDetail = () => {
                            </p>
                             {update.content.map((paragraph, idx) => {
                                 const normalized = (paragraph || '').replace(/&nbsp;/g, ' ').trim();
-                                const isHtmlBlock = /<[^>]+>/.test(normalized);
+                                const isHtmlBlock = /<(p|div|br|ul|ol|li|h[1-6]|blockquote|strong|b|em|i|u|span|a|img|table|thead|tbody|tr|th|td)(\s|>)/i.test(normalized);
 
                                 if (isHtmlBlock) {
                                     return (
