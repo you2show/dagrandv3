@@ -130,7 +130,7 @@ const PracticeDetail = () => {
 
       {/* NEW: Mobile Sticky Sub-Header */}
       {/* Increased z-index to 40 to sit above the menu dropdown */}
-      <div className="lg:hidden sticky top-[72px] z-40 bg-white/95 dark:bg-brand-dark/95 backdrop-blur-md border-b border-gray-100 dark:border-white/10 px-4 py-3 mb-6 flex items-center justify-between shadow-sm transition-all duration-300">
+      <div className="lg:hidden sticky top-[82px] z-40 bg-white/95 dark:bg-brand-dark/95 backdrop-blur-md border-b border-gray-100 dark:border-white/10 px-4 py-3 mb-6 flex items-center justify-between shadow-sm transition-all duration-300">
           <Link to="/practice-areas" className="flex items-center gap-2 text-sm font-bold text-gray-600 dark:text-gray-300 hover:text-brand-navy dark:hover:text-white transition-colors">
               <ArrowLeft className="h-4 w-4" /> {t('backToOverview')}
           </Link>
@@ -143,7 +143,7 @@ const PracticeDetail = () => {
           </button>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-20 relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 lg:pt-12 lg:pb-20 relative">
         <div className="lg:grid lg:grid-cols-12 lg:gap-16">
             
             {/* MAIN CONTENT COLUMN (Left - Spans 8 cols) */}
