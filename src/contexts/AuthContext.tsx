@@ -272,15 +272,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       const updatedUser = { ...foundUser, password: hashPassword(newPassword) };
-      setUsers(prev => prev.map(u => u.id === user.id ? updatedUser : u));
+      setUsers(prev => {
+        const updatedUsers = prev.map(u => u.id === user.id ? updatedUser : u);
+        const mockUsersToSave = updatedUsers.filter(u => u.password && !DEMO_USERS.find(d => d.email === u.email));
+        localStorage.setItem('dagrand_users_list', JSON.stringify(mockUsersToSave));
+        return updatedUsers;
+      });
       const safeUser = sanitizeSessionUser(updatedUser);
       setUser(safeUser);
       localStorage.setItem('dagrand_session', JSON.stringify(safeUser));
-
-      // Persist local/mock custom users for next login.
-      const updatedUsers = users.map(u => u.id === user.id ? updatedUser : u);
-      const mockUsersToSave = updatedUsers.filter(u => u.password && !DEMO_USERS.find(d => d.email === u.email));
-      localStorage.setItem('dagrand_users_list', JSON.stringify(mockUsersToSave));
       return { success: true };
     }
 
