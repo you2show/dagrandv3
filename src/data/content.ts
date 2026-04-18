@@ -89,5 +89,7 @@ export const CONTACT_INFO = {
   ],
   email: "info@dagrand.net",
   linkedin: "https://kh.linkedin.com/company/dagrand-law-office",
-  wechat: "Our WeChat page" 
+  wechat: "Our WeChat page",
+  mapEmbedUrl: "https://www.google.com/maps?q=Dagrand+Law+Office,+Floor+1,+Building+No.+162,+Street+51+corner+Street+334,+Sangkat+Boeung+Keng+Kang+1,+Khan+Chamkarmon,+Phnom+Penh,+Cambodia&z=17&output=embed",
+  googleMapsUrl: "https://maps.app.goo.gl/TT6XZ3YQzY2djwFo9"
 };

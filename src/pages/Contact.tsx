@@ -154,6 +154,27 @@ export default function Contact() {
           </div>
         </div>
       </div>
+      <section className="relative border-t border-brand-gold/60">
+        <iframe
+          title="Dagrand Law Office Location"
+          src={CONTACT_INFO.mapEmbedUrl}
+          className="w-full h-[420px] md:h-[500px] border-0 grayscale-[35%]"
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+        />
+        <div className="absolute top-8 right-4 md:right-10 bg-white p-6 shadow-2xl max-w-sm border-l-4 border-brand-navy">
+          <h3 className="text-2xl font-serif font-bold text-brand-navy mb-3">{t('visitOffice')}</h3>
+          <p className="text-gray-700 leading-relaxed mb-4 text-sm md:text-base">{address}</p>
+          <a
+            href={CONTACT_INFO.googleMapsUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center text-xs md:text-sm font-bold tracking-[0.16em] uppercase text-brand-gold hover:text-brand-navy transition-colors"
+          >
+            {t('openInGoogleMaps')}
+          </a>
+        </div>
+      </section>
     </PageTransition>
   );
 }
