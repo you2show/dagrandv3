@@ -35,6 +35,7 @@ const determineAllowedOrigin = (origin: string | null, origins: string[]) => {
 
 const TELEGRAM_TIMEOUT_MS = 8000
 const TELEGRAM_MAX_ATTEMPTS = 3
+const TELEGRAM_BASE_BACKOFF_MS = 500
 const TELEGRAM_RETRYABLE_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504])
 
 const normalizeField = (value: unknown, fallback = 'N/A', maxLength = 1000) => {
@@ -55,6 +56,11 @@ const escapeHtml = (value: string) => {
 }
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const getBackoffMs = (attemptNumber: number) => attemptNumber * TELEGRAM_BASE_BACKOFF_MS
+const toRetryAfterMs = (seconds: unknown) =>
+  typeof seconds === 'number' && Number.isFinite(seconds) && seconds > 0
+    ? seconds * 1000
+    : null
 
 const parseTelegramError = async (response: Response) => {
   const raw = await response.text()
@@ -66,12 +72,11 @@ const parseTelegramError = async (response: Response) => {
           ? parsed.description.trim()
           : 'Unknown Telegram API error'
       const errorCode = typeof parsed.error_code === 'number' ? parsed.error_code : response.status
-      const retryAfter =
-        typeof parsed?.parameters?.retry_after === 'number' ? parsed.parameters.retry_after : null
+      const retryAfterMs = toRetryAfterMs(parsed?.parameters?.retry_after)
       return {
         description,
         errorCode,
-        retryAfter,
+        retryAfterMs,
         raw,
       }
     }
@@ -82,7 +87,7 @@ const parseTelegramError = async (response: Response) => {
   return {
     description: raw || `Telegram API request failed with status ${response.status}`,
     errorCode: response.status,
-    retryAfter: null as number | null,
+    retryAfterMs: null,
     raw,
   }
 }
@@ -120,27 +125,28 @@ serve(async (req) => {
   try {
     const formData = await req.json()
     if (!formData || typeof formData !== 'object') {
-      return new Response(
-        JSON.stringify({ success: false, error: "Invalid request payload" }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400,
+        return new Response(
+          JSON.stringify({ success: false, error: "invalid request payload" }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400,
         }
       )
     }
 
-    const name = normalizeField((formData as Record<string, unknown>).name ?? (formData as Record<string, unknown>).fullName, 'N/A', 120)
-    const email = normalizeField((formData as Record<string, unknown>).email, 'N/A', 180)
-    const phone = normalizeField((formData as Record<string, unknown>).phone ?? (formData as Record<string, unknown>).phoneNumber, 'N/A', 80)
-    const subject = normalizeField((formData as Record<string, unknown>).subject, 'N/A', 200)
-    const message = normalizeField((formData as Record<string, unknown>).message, '', 3200)
+    const data = formData as Record<string, unknown>
+    const name = normalizeField(data.name ?? data.fullName, 'N/A', 120)
+    const email = normalizeField(data.email, 'N/A', 180)
+    const phone = normalizeField(data.phone ?? data.phoneNumber, 'N/A', 80)
+    const subject = normalizeField(data.subject, 'N/A', 200)
+    const message = normalizeField(data.message, '', 3200)
 
     if (!message) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Message is required" }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400,
+        return new Response(
+          JSON.stringify({ success: false, error: "message is required" }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400,
         }
       )
     }
@@ -198,16 +204,15 @@ serve(async (req) => {
         if (!telegramResponse.ok) {
           const parsedError = await parseTelegramError(telegramResponse)
           lastError = parsedError.description
-          const retryAfterDelay = parsedError.retryAfter ? parsedError.retryAfter * 1000 : null
           const isRetryable = TELEGRAM_RETRYABLE_STATUS.has(telegramResponse.status)
           console.error("Failed to send telegram message", {
             attempt,
             status: telegramResponse.status,
             description: parsedError.description,
-            retryAfter: parsedError.retryAfter,
+            retryAfterMs: parsedError.retryAfterMs,
           })
           if (attempt < TELEGRAM_MAX_ATTEMPTS && isRetryable) {
-            await delay(retryAfterDelay ?? attempt * 400)
+            await delay(parsedError.retryAfterMs ?? getBackoffMs(attempt))
             continue
           }
           return new Response(
@@ -226,20 +231,17 @@ serve(async (req) => {
               ? telegramResult.description.trim()
               : "Telegram API returned an invalid success response"
           const errorCode = typeof telegramResult?.error_code === 'number' ? telegramResult.error_code : 502
-          const retryAfter =
-            typeof telegramResult?.parameters?.retry_after === 'number'
-              ? telegramResult.parameters.retry_after * 1000
-              : null
+          const retryAfterMs = toRetryAfterMs(telegramResult?.parameters?.retry_after)
           lastError = description
           const isRetryable = TELEGRAM_RETRYABLE_STATUS.has(errorCode)
           console.error("Telegram API returned non-success payload", {
             attempt,
             errorCode,
             description,
-            retryAfter,
+            retryAfterMs,
           })
           if (attempt < TELEGRAM_MAX_ATTEMPTS && isRetryable) {
-            await delay(retryAfter ?? attempt * 400)
+            await delay(retryAfterMs ?? getBackoffMs(attempt))
             continue
           }
           return new Response(
@@ -273,7 +275,7 @@ serve(async (req) => {
         lastError = fallbackError
         console.error("Telegram network error", { attempt, error: fallbackError })
         if (attempt < TELEGRAM_MAX_ATTEMPTS) {
-          await delay(attempt * 500)
+          await delay(getBackoffMs(attempt))
           continue
         }
         return new Response(
