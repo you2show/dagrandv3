@@ -26,7 +26,7 @@
 ## 3) Run the debug workflow
 
 Workflow file:  
-`/home/runner/work/dagrandv3/dagrandv3/.github/workflows/supabase-debug.yml`
+`.github/workflows/supabase-debug.yml`
 
 របៀប run:
 
