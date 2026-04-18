@@ -51,7 +51,15 @@ export default function Contact() {
   return (
     <PageTransition>
       <SEO title="Contact Us" description="Get in touch with our legal team." />
-      <div className="py-20 bg-brand-gray dark:bg-brand-dark min-h-screen pt-32">
+      <section className="pt-28 md:pt-32 bg-brand-navy text-white relative overflow-hidden">
+        <div className="absolute inset-0 opacity-15 bg-[radial-gradient(circle_at_25%_25%,rgba(255,255,255,0.14),transparent_40%)]" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-28 text-center relative z-10">
+          <h1 className="text-6xl md:text-7xl font-serif font-bold">{t('contact')}</h1>
+          <div className="w-36 h-1 bg-brand-gold mx-auto my-8"></div>
+          <p className="text-2xl md:text-3xl text-white/90 font-light">{t('contactSubtitle')}</p>
+        </div>
+      </section>
+      <div className="py-20 bg-brand-gray dark:bg-brand-dark min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 shadow-xl overflow-hidden">
             <div className="lg:col-span-5 bg-brand-navy text-white p-10 md:p-12">

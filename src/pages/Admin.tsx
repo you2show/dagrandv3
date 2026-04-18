@@ -202,8 +202,18 @@ const Admin = () => {
 
   const canEditArticle = (article: LegalUpdate) => {
       if (isAdmin) return true;
-      if (user && article.authorId === user.id) return true;
-      if (user && article.author?.name === user.name) return true;
+      if (!user) return false;
+      if (article.authorId === user.id) return true;
+      const author = (article as any).author;
+      if (author && typeof author === 'object' && author.id === user.id) return true;
+      if (typeof author === 'string') {
+          try {
+              const parsedAuthor = JSON.parse(author);
+              if (parsedAuthor?.id === user.id) return true;
+          } catch {
+              return false;
+          }
+      }
       return false;
   };
 
