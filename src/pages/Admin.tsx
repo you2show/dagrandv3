@@ -41,20 +41,42 @@ const RichTextEditor = ({ value, onChange, placeholder }: { value: string, onCha
     const editorRef = useRef<HTMLDivElement>(null);
     const [isFocused, setIsFocused] = useState(false);
 
+    const sanitizeEditorHtml = (html: string) =>
+        DOMPurify.sanitize(html, { USE_PROFILES: { html: true } }).replace(/&nbsp;/g, ' ');
+
     // Initial value sync
     useEffect(() => {
         if (editorRef.current && editorRef.current.innerHTML !== value) {
-            // Sanitize and replace &nbsp; with space for the editor
-            const sanitizedValue = value ? value.replace(/&nbsp;/g, ' ') : '';
+            const sanitizedValue = value ? sanitizeEditorHtml(value) : '';
             editorRef.current.innerHTML = sanitizedValue;
         }
     }, [value]);
 
     const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
-        // Sanitize the content when saving
-        const content = e.currentTarget.innerHTML;
+        const content = sanitizeEditorHtml(e.currentTarget.innerHTML);
         if (content !== value) {
             onChange(content);
+        }
+    };
+
+    const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        const html = e.clipboardData.getData('text/html');
+        const text = e.clipboardData.getData('text/plain');
+        const pastedContent = html && html.trim() ? html : text;
+        const sanitized = sanitizeEditorHtml(pastedContent);
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+            const fragment = range.createContextualFragment(sanitized);
+            range.insertNode(fragment);
+            range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+        if (editorRef.current) {
+            onChange(sanitizeEditorHtml(editorRef.current.innerHTML));
         }
     };
 
@@ -105,6 +127,7 @@ const RichTextEditor = ({ value, onChange, placeholder }: { value: string, onCha
                 className="prose prose-sm max-w-none p-5 min-h-[400px] outline-none text-gray-700 font-light leading-relaxed cursor-text"
                 contentEditable
                 onInput={handleInput}
+                onPaste={handlePaste}
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => setIsFocused(false)}
                 data-placeholder={placeholder}
@@ -669,7 +692,11 @@ const Admin = () => {
       // Store the editor content as an array of 1 string (The full HTML blob)
       // This maintains type compatibility with string[] while allowing full HTML richness
       // Sanitize and replace &nbsp; with space before saving
-      const finalContent = [editorContent.replace(/&nbsp;/g, ' ')]; 
+      const sanitizedEditorContent = DOMPurify
+          .sanitize(editorContent || '', { USE_PROFILES: { html: true } })
+          .replace(/&nbsp;/g, ' ')
+          .trim();
+      const finalContent = [sanitizedEditorContent]; 
       
       const sanitizedTitle = DOMPurify.sanitize(formData.title || '');
       const sanitizedSummary = DOMPurify.sanitize(formData.summary || '');

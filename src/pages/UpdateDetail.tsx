@@ -247,9 +247,27 @@ const UpdateDetail = () => {
                            <p className="lead font-medium text-xl text-brand-navy dark:text-white italic mb-8 border-l-4 border-brand-gold pl-4 text-justify leading-loose">
                                {update.summary}
                            </p>
-                           {update.content.map((paragraph, idx) => (
-                               <p key={idx} className="mb-8 text-justify leading-loose text-gray-700 dark:text-gray-300 font-light break-words">{paragraph.replace(/&nbsp;/g, ' ')}</p>
-                           ))}
+                            {update.content.map((paragraph, idx) => {
+                                const normalized = (paragraph || '').replace(/&nbsp;/g, ' ').trim();
+                                const parsed = new DOMParser().parseFromString(normalized, 'text/html');
+                                const isHtmlBlock = !!parsed.body.querySelector('p, div, br, ul, ol, li, h1, h2, h3, h4, h5, h6, blockquote, strong, b, em, i, u, span, a, img, table, thead, tbody, tr, th, td');
+
+                                if (isHtmlBlock) {
+                                    return (
+                                        <div
+                                            key={idx}
+                                            className="mb-8 text-justify leading-loose text-gray-700 dark:text-gray-300 font-light break-words"
+                                            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(normalized) }}
+                                        />
+                                    );
+                                }
+
+                                return (
+                                    <p key={idx} className="mb-8 text-justify leading-loose text-gray-700 dark:text-gray-300 font-light break-words">
+                                        {normalized}
+                                    </p>
+                                );
+                            })}
                        </div>
                         
                        {/* Share / Tags Area */}

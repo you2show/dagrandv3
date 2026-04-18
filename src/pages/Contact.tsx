@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, Phone, MapPin, Send } from 'lucide-react';
-import SEO from '../components/SEO';
-import PageTransition from '../components/PageTransition';
+import { SEO } from '../components/SEO';
+import { PageTransition } from '../components/PageTransition';
 import { sendTelegramMessage } from '../lib/telegram';
 
 export default function Contact() {
