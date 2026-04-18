@@ -216,7 +216,7 @@ serve(async (req) => {
             continue
           }
           return new Response(
-            JSON.stringify({ success: false, error: lastError }),
+            JSON.stringify({ success: false, error: lastError, retryable: isRetryable }),
             {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: isRetryable ? 503 : 502,
@@ -245,7 +245,7 @@ serve(async (req) => {
             continue
           }
           return new Response(
-            JSON.stringify({ success: false, error: description }),
+            JSON.stringify({ success: false, error: description, retryable: isRetryable }),
             {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: isRetryable ? 503 : 502,
@@ -279,7 +279,7 @@ serve(async (req) => {
           continue
         }
         return new Response(
-          JSON.stringify({ success: false, error: fallbackError }),
+          JSON.stringify({ success: false, error: fallbackError, retryable: true }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 503,
@@ -290,6 +290,7 @@ serve(async (req) => {
       }
     }
 
+    // Safety fallback: should be unreachable because the loop returns on final failure.
     return new Response(
       JSON.stringify({ success: false, error: lastError }),
       {

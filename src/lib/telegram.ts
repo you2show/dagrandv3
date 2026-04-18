@@ -42,6 +42,7 @@ export const sendTelegramMessage = async (data: TelegramContactPayload) => {
     let message = lastError;
 
     let responseStatus: number | null = null;
+    let responseRetryable = false;
 
     if (error) {
       message = error.message || message;
@@ -53,18 +54,21 @@ export const sendTelegramMessage = async (data: TelegramContactPayload) => {
           if (typeof contextPayload?.error === 'string' && contextPayload.error.trim()) {
             message = contextPayload.error.trim();
           }
+          if (contextPayload?.retryable === true) {
+            responseRetryable = true;
+          }
         } catch {
           // Keep fallback error message.
         }
       }
     } else if (result && !result.success) {
       message = result.error || message;
+      responseRetryable = result.retryable === true;
     }
 
     const isEdgeRequestError =
       (error as { name?: string } | null)?.name === 'FunctionsFetchError';
-    const isRetryableStatus =
-      responseStatus !== null && [408, 409, 425, 429, 500, 502, 503, 504].includes(responseStatus);
+    const isRetryableStatus = responseStatus !== null && responseStatus >= 500;
     const isRetryableMessage =
       /network|fetch|timeout|502|503|504|temporary|temporarily|unavailable|try again|rate limit/i.test(message);
 
@@ -72,7 +76,7 @@ export const sendTelegramMessage = async (data: TelegramContactPayload) => {
       ? 'Delivery status is unknown because of a network response issue. Please retry once only if you did not receive confirmation.'
       : message;
     const shouldRetry =
-      isEdgeRequestError || isRetryableStatus || isRetryableMessage;
+      isEdgeRequestError || responseRetryable || isRetryableStatus || isRetryableMessage;
     if (attempt < maxAttempts && shouldRetry) {
       await new Promise((resolve) => setTimeout(resolve, 500));
       continue;
