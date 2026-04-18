@@ -42,6 +42,8 @@ export default function Contact() {
             initial={{ opacity: 0, y: -12, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
+            role="status"
+            aria-live="polite"
             className="w-full max-w-md rounded-md border border-brand-gold/70 bg-brand-navy px-4 py-3 shadow-xl"
           >
             <div className="flex items-start gap-3">
@@ -65,6 +67,8 @@ export default function Contact() {
             initial={{ opacity: 0, y: -12, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
+            role="alert"
+            aria-live="assertive"
             className="w-full max-w-md rounded-md border border-red-300 bg-white px-4 py-3 shadow-xl"
           >
             <div className="flex items-start gap-3">

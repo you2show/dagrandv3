@@ -27,22 +27,37 @@ const determineAllowedOrigin = (origin: string | null, origins: string[]) => {
     return '*'
   }
 
-  return 'null'
+  return null
 }
 
 serve(async (req) => {
   const origin = req.headers.get('origin')
   const allowOrigin = determineAllowedOrigin(origin, allowedOrigins)
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': allowOrigin,
+  const corsHeaders: Record<string, string> = {
     'Vary': 'Origin',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Max-Age': '86400',
   }
+  if (allowOrigin) {
+    corsHeaders['Access-Control-Allow-Origin'] = allowOrigin
+  }
 
   if (req.method === 'OPTIONS') {
+    if (!allowOrigin) {
+      return new Response(null, { status: 403, headers: { 'Vary': 'Origin' } })
+    }
     return new Response(null, { headers: corsHeaders, status: 204 })
+  }
+
+  if (!allowOrigin) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Origin not allowed' }),
+      {
+        headers: { 'Content-Type': 'application/json', 'Vary': 'Origin' },
+        status: 403,
+      }
+    )
   }
 
   try {
