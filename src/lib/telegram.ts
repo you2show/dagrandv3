@@ -58,11 +58,11 @@ export const sendTelegramMessage = async (data: TelegramContactPayload) => {
       message = result.error || message;
     }
 
-    const isEdgeFetchError =
+    const isEdgeRequestError =
       (error as { name?: string } | null)?.name === 'FunctionsFetchError' ||
       /Failed to send a request to the Edge Function/i.test(message);
 
-    if (isEdgeFetchError) {
+    if (isEdgeRequestError) {
       throw new Error(
         'Unable to confirm message delivery because of a network response issue. Please retry once if needed.'
       );

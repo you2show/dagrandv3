@@ -19,12 +19,12 @@ if (allowedOrigins.length === 0) {
 }
 
 const determineAllowedOrigin = (origin: string | null, origins: string[]) => {
-  if (origin && (origins.length === 0 || origins.includes(origin))) {
-    return origin
+  if (origins.length === 0) {
+    return origin ?? '*'
   }
 
-  if (origins.length === 0) {
-    return '*'
+  if (origin && origins.includes(origin)) {
+    return origin
   }
 
   return null
