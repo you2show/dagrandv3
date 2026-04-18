@@ -4,19 +4,35 @@ const allowedOrigins = (Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '')
   .split(',')
   .map((entry) => entry.trim())
   .filter(Boolean)
+  .filter((origin) => {
+    try {
+      new URL(origin)
+      return true
+    } catch {
+      console.warn(`Ignoring invalid CORS origin: ${origin}`)
+      return false
+    }
+  })
 
 if (allowedOrigins.length === 0) {
   console.warn('CORS_ALLOWED_ORIGINS is empty; contact-form will use wildcard CORS.')
 }
 
+const determineAllowedOrigin = (origin: string | null, origins: string[]) => {
+  if (origin && (origins.length === 0 || origins.includes(origin))) {
+    return origin
+  }
+
+  if (origins.length === 0) {
+    return '*'
+  }
+
+  return 'null'
+}
+
 serve(async (req) => {
   const origin = req.headers.get('origin')
-  const allowOrigin =
-    origin && (allowedOrigins.length === 0 || allowedOrigins.includes(origin))
-      ? origin
-      : allowedOrigins.length === 0
-        ? '*'
-        : 'null'
+  const allowOrigin = determineAllowedOrigin(origin, allowedOrigins)
   const corsHeaders = {
     'Access-Control-Allow-Origin': allowOrigin,
     'Vary': 'Origin',
