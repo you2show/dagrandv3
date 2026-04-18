@@ -71,6 +71,15 @@ jobs:
             exit 1
           fi
 
+          db_host="$(node -e "console.log(new URL(process.env.SUPABASE_DB_URL).hostname)")"
+          ipv4_hostaddr="$(getent ahostsv4 "${db_host}" | awk 'NR==1 {print $1}')"
+          if [[ -n "${ipv4_hostaddr}" ]]; then
+            export PGHOSTADDR="${ipv4_hostaddr}"
+            echo "Using IPv4 hostaddr ${PGHOSTADDR} for ${db_host}"
+          else
+            echo "No IPv4 address found for ${db_host}; using default DNS resolution."
+          fi
+
           psql "${SUPABASE_DB_URL}" \
             -v ON_ERROR_STOP=1 \
             -c "select current_database() as database, current_user as user, now() as server_time;"
