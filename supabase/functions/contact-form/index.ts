@@ -32,13 +32,16 @@ serve(async (req) => {
       )
     }
 
-    const escapeHtml = (value: string) =>
-      value
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
+    const escapeHtml = (value: string) => {
+      const htmlEntities: Record<string, string> = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;',
+      };
+      return value.replace(/[&<>"']/g, (char) => htmlEntities[char]);
+    }
 
     const safeName = escapeHtml(String(name))
     const safeEmail = escapeHtml(String(email))

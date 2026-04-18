@@ -63,7 +63,7 @@ const RichTextEditor = ({ value, onChange, placeholder }: { value: string, onCha
         e.preventDefault();
         const html = e.clipboardData.getData('text/html');
         const text = e.clipboardData.getData('text/plain');
-        const pastedContent = html || text;
+        const pastedContent = html && html.trim() ? html : text;
         const sanitized = sanitizeEditorHtml(pastedContent);
         const selection = window.getSelection();
         if (selection && selection.rangeCount > 0) {

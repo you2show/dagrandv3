@@ -249,7 +249,8 @@ const UpdateDetail = () => {
                            </p>
                             {update.content.map((paragraph, idx) => {
                                 const normalized = (paragraph || '').replace(/&nbsp;/g, ' ').trim();
-                                const isHtmlBlock = /<(p|div|br|ul|ol|li|h[1-6]|blockquote|strong|b|em|i|u|span|a|img|table|thead|tbody|tr|th|td)(\s|>)/i.test(normalized);
+                                const parsed = new DOMParser().parseFromString(normalized, 'text/html');
+                                const isHtmlBlock = !!parsed.body.querySelector('p, div, br, ul, ol, li, h1, h2, h3, h4, h5, h6, blockquote, strong, b, em, i, u, span, a, img, table, thead, tbody, tr, th, td');
 
                                 if (isHtmlBlock) {
                                     return (
