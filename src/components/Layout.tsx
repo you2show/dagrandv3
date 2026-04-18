@@ -7,7 +7,7 @@ import { CONTACT_INFO } from '../../constants';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { InstallPWA } from './InstallPWA';
-import { FloatingContact } from './FloatingContact';
+import FloatingContact from './FloatingContact';
 
 // Define Variants type locally to avoid import errors
 type Variants = {

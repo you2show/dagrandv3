@@ -247,9 +247,26 @@ const UpdateDetail = () => {
                            <p className="lead font-medium text-xl text-brand-navy dark:text-white italic mb-8 border-l-4 border-brand-gold pl-4 text-justify leading-loose">
                                {update.summary}
                            </p>
-                           {update.content.map((paragraph, idx) => (
-                               <p key={idx} className="mb-8 text-justify leading-loose text-gray-700 dark:text-gray-300 font-light break-words">{paragraph.replace(/&nbsp;/g, ' ')}</p>
-                           ))}
+                            {update.content.map((paragraph, idx) => {
+                                const normalized = (paragraph || '').replace(/&nbsp;/g, ' ').trim();
+                                const isHtmlBlock = /<[^>]+>/.test(normalized);
+
+                                if (isHtmlBlock) {
+                                    return (
+                                        <div
+                                            key={idx}
+                                            className="mb-8 text-justify leading-loose text-gray-700 dark:text-gray-300 font-light break-words"
+                                            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(normalized) }}
+                                        />
+                                    );
+                                }
+
+                                return (
+                                    <p key={idx} className="mb-8 text-justify leading-loose text-gray-700 dark:text-gray-300 font-light break-words">
+                                        {normalized}
+                                    </p>
+                                );
+                            })}
                        </div>
                         
                        {/* Share / Tags Area */}

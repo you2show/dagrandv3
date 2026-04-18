@@ -1,31 +1,29 @@
-export const sendTelegramMessage = async (data: any) => {
-  const BOT_TOKEN = '8729871717:AAFWwQ77BuHZytSbJk23Brzd75dzZLg5-Lg';
-  const CHAT_ID = '905513579';
+import { supabase } from './supabaseClient';
 
-  const text = `
-📩 <b>New Message (dagrandv3)</b>
+export type TelegramContactPayload = {
+  name?: string;
+  email?: string;
+  phone?: string;
+  subject?: string;
+  message: string;
+};
 
-👤 <b>Name:</b> ${data.name || 'N/A'}
-📧 <b>Email:</b> ${data.email || 'N/A'}
-📞 <b>Phone:</b> ${data.phone || 'N/A'}
-📝 <b>Subject:</b> ${data.subject || 'N/A'}
-💬 <b>Message:</b>
-${data.message || 'N/A'}
-  `;
+export const sendTelegramMessage = async (data: TelegramContactPayload) => {
+  if (!supabase) {
+    throw new Error('Contact service is unavailable right now.');
+  }
 
-  const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: CHAT_ID,
-      text: text,
-      parse_mode: 'HTML'
-    })
+  const { data: result, error } = await supabase.functions.invoke('contact-form', {
+    body: data
   });
 
-  if (!response.ok) {
-    throw new Error('Failed to send Telegram message');
+  if (error) {
+    throw new Error(error.message || 'Failed to send Telegram message');
   }
-  
-  return response.json();
+
+  if (!result?.success) {
+    throw new Error(result?.error || 'Failed to send Telegram message');
+  }
+
+  return result;
 };
