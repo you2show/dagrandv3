@@ -202,7 +202,7 @@ const PracticeDetail = () => {
             </div>
 
             {/* SIDEBAR (Right - Spans 4 cols) */}
-            <div className="lg:col-span-4 mt-12 lg:mt-0">
+            <div className="hidden lg:block lg:col-span-4 mt-12 lg:mt-0">
                 {/* Updated top offset for Sidebar as well */}
                 <div className="sticky top-28 space-y-8">
                     {/* Topics Widget */}
