@@ -24,6 +24,7 @@ const TELEGRAM_TIMEOUT_MS = 8000
 const TELEGRAM_MAX_ATTEMPTS = 2
 const TELEGRAM_BASE_BACKOFF_MS = 500
 const TELEGRAM_RETRYABLE_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504])
+const DEFAULT_TELEGRAM_GROUP_CHAT_ID = '-1003986946717'
 
 const normalizeField = (value: unknown, fallback = 'N/A', maxLength = 1000) => {
   const normalized = typeof value === 'string' ? value.trim() : ''
@@ -144,7 +145,10 @@ serve(async (req) => {
     }
 
     const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN")
-    const TELEGRAM_CHAT_IDS_RAW = Deno.env.get("TELEGRAM_CHAT_IDS") ?? Deno.env.get("TELEGRAM_CHAT_ID") ?? ""
+    const TELEGRAM_CHAT_IDS_RAW =
+      Deno.env.get("TELEGRAM_CHAT_IDS") ??
+      Deno.env.get("TELEGRAM_CHAT_ID") ??
+      DEFAULT_TELEGRAM_GROUP_CHAT_ID
     const TELEGRAM_CHAT_IDS = TELEGRAM_CHAT_IDS_RAW
       .split(",")
       .map((chatId) => chatId.trim())
