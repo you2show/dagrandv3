@@ -83,6 +83,12 @@ export const CONTACT_INFO = {
   address_cn: "柬埔寨金边市桑园区BKK1区334号路与51号路拐角162号大楼1楼 ，达观律师事务所",
   businessHours: "Mondays – Fridays, 9am – 5pm",
   businessHours_cn: "周一至周五，上午9点至下午5点",
+  map: {
+    embedUrl: "https://www.google.com/maps?q=11.550368552320647,104.92719260695569&z=18&output=embed",
+    directionUrl: "https://maps.app.goo.gl/TT6XZ3YQzY2djwFo9",
+    plusCode: "HW2G+4V Phnom Penh",
+    coordinates: "11.550368552320647, 104.92719260695569"
+  },
   phones: [
     { label: "Khmer, English, French", number: "+855 (0)98 539 910" },
     { label: "Chinese", number: "+855 (0)96 866 8508" }

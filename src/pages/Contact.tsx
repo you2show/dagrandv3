@@ -12,10 +12,6 @@ export default function Contact() {
   const { t, getContent } = useLanguage();
   const address = getContent(CONTACT_INFO.address, CONTACT_INFO.address_cn);
   const businessHours = getContent(CONTACT_INFO.businessHours, CONTACT_INFO.businessHours_cn);
-  const mapEmbedUrl = 'https://www.google.com/maps?q=11.550368552320647,104.92719260695569&z=18&output=embed';
-  const mapDirectionUrl = 'https://maps.app.goo.gl/TT6XZ3YQzY2djwFo9';
-  const mapPlusCode = 'HW2G+4V Phnom Penh';
-  const mapCoordinates = '11.550368552320647, 104.92719260695569';
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -189,10 +185,10 @@ export default function Contact() {
               <h2 className="text-3xl md:text-4xl font-serif font-bold text-brand-navy dark:text-white">{t('visitOffice')}</h2>
               <p className="mt-3 text-sm md:text-base text-gray-600 dark:text-gray-300 leading-relaxed">{address}</p>
               <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 text-xs md:text-sm text-gray-500 dark:text-gray-400">
-                <span>{mapPlusCode}</span>
-                <span>{mapCoordinates}</span>
+                <span>{CONTACT_INFO.map.plusCode}</span>
+                <span>{CONTACT_INFO.map.coordinates}</span>
                 <a
-                  href={mapDirectionUrl}
+                  href={CONTACT_INFO.map.directionUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 text-brand-navy dark:text-brand-gold hover:opacity-80 transition-opacity font-semibold"
@@ -203,7 +199,7 @@ export default function Contact() {
               </div>
             </div>
             <iframe
-              src={mapEmbedUrl}
+              src={CONTACT_INFO.map.embedUrl}
               title="Dagrand Law Office Map Location"
               className="w-full h-[360px] md:h-[420px] border-0"
               loading="lazy"
