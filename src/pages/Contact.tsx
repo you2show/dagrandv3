@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Mail, Phone, MapPin, Send, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -19,6 +19,10 @@ export default function Contact() {
     message: ''
   });
   const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  // useRef guard prevents duplicate submissions even if the state update
+  // hasn't re-rendered the button yet (e.g. rapid double-click).
+  const submittingRef = useRef(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -26,7 +30,11 @@ export default function Contact() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loading) return;
+    // Ref guard: synchronously prevents any concurrent call before the async
+    // function even starts. This catches rapid double-clicks that would slip
+    // through a state-based guard due to React's render batching.
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setLoading(true);
 
     try {
@@ -36,28 +44,10 @@ export default function Contact() {
         subject: formData.subject.trim(),
         message: formData.message.trim()
       });
-      toast.custom(
-        () => (
-          <motion.div
-            initial={{ opacity: 0, y: -12, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.25, ease: 'easeOut' }}
-            role="status"
-            aria-live="polite"
-            className="w-full max-w-md rounded-md border border-brand-gold/70 bg-brand-navy px-4 py-3 shadow-xl"
-          >
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="mt-0.5 h-5 w-5 text-brand-gold" />
-              <div>
-                <p className="font-serif text-base font-bold tracking-wide text-white">Message sent successfully</p>
-                <p className="mt-1 text-sm text-white/80">Thank you. Our legal team will contact you shortly.</p>
-              </div>
-            </div>
-          </motion.div>
-        ),
-        { duration: 4200 }
-      );
-      setFormData({ fullName: '', email: '', subject: '', message: '' });
+      // Mark as submitted so the form is replaced by the success panel.
+      // Keep submittingRef.current = true so any race-condition click while
+      // the success panel is still rendering cannot trigger a second send.
+      setSubmitted(true);
     } catch (err: unknown) {
       console.error('Error sending message:', err);
       const message = err instanceof Error ? err.message : 'Failed to send message. Please try again.';
@@ -82,6 +72,8 @@ export default function Contact() {
         ),
         { duration: 5000 }
       );
+      // Release the lock only on failure so the user can try again.
+      submittingRef.current = false;
     } finally {
       setLoading(false);
     }
@@ -152,33 +144,91 @@ export default function Contact() {
             </div>
 
             <div className="lg:col-span-7 bg-[#ececec] dark:bg-gray-800 p-8 md:p-10">
-              <h2 className="text-4xl md:text-5xl font-serif font-bold mb-8 text-brand-navy dark:text-white">{t('sendMessage')}</h2>
+              {submitted ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, ease: 'easeOut' }}
+                  className="flex flex-col items-center justify-center h-full min-h-[300px] text-center gap-5"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <CheckCircle2 className="w-14 h-14 text-brand-gold" />
+                  <h2 className="text-3xl md:text-4xl font-serif font-bold text-brand-navy dark:text-white">Message Sent!</h2>
+                  <p className="text-gray-600 dark:text-gray-300 max-w-sm text-base leading-relaxed">
+                    Thank you for reaching out. Our legal team will review your message and contact you shortly.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSubmitted(false);
+                      submittingRef.current = false;
+                      setFormData({ fullName: '', email: '', subject: '', message: '' });
+                    }}
+                    className="mt-2 text-sm text-brand-navy dark:text-brand-gold underline underline-offset-4 hover:opacity-70 transition-opacity"
+                  >
+                    Send another message
+                  </button>
+                </motion.div>
+              ) : (
+                <>
+                  <h2 className="text-4xl md:text-5xl font-serif font-bold mb-8 text-brand-navy dark:text-white">{t('sendMessage')}</h2>
 
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div>
-                    <label className="block text-xs font-bold tracking-[0.18em] uppercase text-gray-600 dark:text-gray-300 mb-2">{t('fullName')}</label>
-                    <input type="text" name="fullName" required value={formData.fullName} onChange={handleChange} className="w-full px-4 py-3.5 border border-gray-300 bg-[#f3f3f3] text-gray-700 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-brand-navy focus:border-brand-navy" placeholder="John Doe" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold tracking-[0.18em] uppercase text-gray-600 dark:text-gray-300 mb-2">{t('emailAddress')}</label>
-                    <input type="email" name="email" required value={formData.email} onChange={handleChange} className="w-full px-4 py-3.5 border border-gray-300 bg-[#f3f3f3] text-gray-700 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-brand-navy focus:border-brand-navy" placeholder="email@example.com" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold tracking-[0.18em] uppercase text-gray-600 dark:text-gray-300 mb-2">{t('subject')}</label>
-                  <input type="text" name="subject" required value={formData.subject} onChange={handleChange} className="w-full px-4 py-3.5 border border-gray-300 bg-[#f3f3f3] text-gray-700 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-brand-navy focus:border-brand-navy" placeholder="Legal Inquiry..." />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold tracking-[0.18em] uppercase text-gray-600 dark:text-gray-300 mb-2">{t('message')}</label>
-                  <textarea name="message" required rows={6} value={formData.message} onChange={handleChange} className="w-full px-4 py-3.5 border border-gray-300 bg-[#f3f3f3] text-gray-700 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-brand-navy focus:border-brand-navy" placeholder="How can we help you?" />
-                </div>
-                <button type="submit" disabled={loading} className="inline-flex items-center justify-center bg-brand-gold hover:bg-brand-goldLight text-white text-sm font-bold py-3.5 px-8 tracking-[0.18em] uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                  {loading ? 'Sending...' : <><Send className="w-5 h-5 mr-3" /> {t('sendBtn')}</>}
-                </button>
-              </form>
+                  <form onSubmit={handleSubmit} className="space-y-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div>
+                        <label className="block text-xs font-bold tracking-[0.18em] uppercase text-gray-600 dark:text-gray-300 mb-2">{t('fullName')}</label>
+                        <input type="text" name="fullName" required value={formData.fullName} onChange={handleChange} className="w-full px-4 py-3.5 border border-gray-300 bg-[#f3f3f3] text-gray-700 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-brand-navy focus:border-brand-navy" placeholder="John Doe" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold tracking-[0.18em] uppercase text-gray-600 dark:text-gray-300 mb-2">{t('emailAddress')}</label>
+                        <input type="email" name="email" required value={formData.email} onChange={handleChange} className="w-full px-4 py-3.5 border border-gray-300 bg-[#f3f3f3] text-gray-700 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-brand-navy focus:border-brand-navy" placeholder="email@example.com" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold tracking-[0.18em] uppercase text-gray-600 dark:text-gray-300 mb-2">{t('subject')}</label>
+                      <input type="text" name="subject" required value={formData.subject} onChange={handleChange} className="w-full px-4 py-3.5 border border-gray-300 bg-[#f3f3f3] text-gray-700 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-brand-navy focus:border-brand-navy" placeholder="Legal Inquiry..." />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold tracking-[0.18em] uppercase text-gray-600 dark:text-gray-300 mb-2">{t('message')}</label>
+                      <textarea name="message" required rows={6} value={formData.message} onChange={handleChange} className="w-full px-4 py-3.5 border border-gray-300 bg-[#f3f3f3] text-gray-700 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-brand-navy focus:border-brand-navy" placeholder="How can we help you?" />
+                    </div>
+                    <button type="submit" disabled={loading} className="inline-flex items-center justify-center bg-brand-gold hover:bg-brand-goldLight text-white text-sm font-bold py-3.5 px-8 tracking-[0.18em] uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                      {loading ? 'Sending...' : <><Send className="w-5 h-5 mr-3" /> {t('sendBtn')}</>}
+                    </button>
+                  </form>
+                </>
+              )}
             </div>
           </div>
+
+          <section className="mt-10 md:mt-12 rounded-sm overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl">
+            <div className="px-6 md:px-10 pt-8 md:pt-10 pb-6 border-b border-gray-100 dark:border-gray-800">
+              <h2 className="text-3xl md:text-4xl font-serif font-bold text-brand-navy dark:text-white">{t('visitOffice')}</h2>
+              <p className="mt-3 text-sm md:text-base text-gray-600 dark:text-gray-300 leading-relaxed">{address}</p>
+              <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 text-xs md:text-sm text-gray-500 dark:text-gray-400">
+                <span>{CONTACT_INFO.map.plusCode}</span>
+                <span>{CONTACT_INFO.map.coordinates}</span>
+                <a
+                  href={CONTACT_INFO.map.directionUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-brand-navy dark:text-brand-gold hover:opacity-80 transition-opacity font-semibold"
+                >
+                  <MapPin className="w-4 h-4" />
+                  {t('openInGoogleMaps')}
+                </a>
+              </div>
+            </div>
+            <iframe
+              src={CONTACT_INFO.map.embedUrl}
+              title="Dagrand Law Office Map Location"
+              className="w-full h-[360px] md:h-[420px] border-0"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              allowFullScreen
+            />
+          </section>
         </div>
       </div>
     </PageTransition>
