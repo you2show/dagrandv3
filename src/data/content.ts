@@ -1,5 +1,8 @@
 
 export const SITE_NAME = "Dagrand Law Office";
+const OFFICE_MAP_LATITUDE = 11.550368552320647;
+const OFFICE_MAP_LONGITUDE = 104.92719260695569;
+const OFFICE_MAP_ZOOM = 18;
 
 export const ABOUT_TEXT = [
   "Dagrand Law Office is a boutique firm registered with the Bar Association of the Kingdom of Cambodia, dedicated to delivering high-quality legal services. Our expertise spans dispute resolution, corporate and commercial matters, employment, investment, intellectual property rights, securities, mergers and acquisitions, taxation, and international trade.",
@@ -84,10 +87,12 @@ export const CONTACT_INFO = {
   businessHours: "Mondays – Fridays, 9am – 5pm",
   businessHours_cn: "周一至周五，上午9点至下午5点",
   map: {
-    embedUrl: "https://www.google.com/maps?q=11.550368552320647,104.92719260695569&z=18&output=embed",
+    latitude: OFFICE_MAP_LATITUDE,
+    longitude: OFFICE_MAP_LONGITUDE,
+    embedUrl: `https://www.google.com/maps?q=${OFFICE_MAP_LATITUDE},${OFFICE_MAP_LONGITUDE}&z=${OFFICE_MAP_ZOOM}&output=embed`,
     directionUrl: "https://maps.app.goo.gl/TT6XZ3YQzY2djwFo9",
     plusCode: "HW2G+4V Phnom Penh",
-    coordinates: "11.550368552320647, 104.92719260695569"
+    coordinates: `${OFFICE_MAP_LATITUDE}, ${OFFICE_MAP_LONGITUDE}`
   },
   phones: [
     { label: "Khmer, English, French", number: "+855 (0)98 539 910" },
