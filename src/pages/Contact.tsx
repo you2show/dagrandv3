@@ -90,7 +90,7 @@ export default function Contact() {
           <p className="text-lg md:text-xl text-gray-200 max-w-2xl mx-auto font-light leading-relaxed">{t('contactSubtitle')}</p>
         </div>
       </section>
-      <div className="py-16 md:py-20 bg-brand-gray dark:bg-brand-dark min-h-screen">
+      <div className="pt-16 md:pt-20 pb-0 bg-brand-gray dark:bg-brand-dark min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 shadow-xl overflow-hidden rounded-sm">
             <div className="lg:col-span-5 bg-brand-navy text-white p-8 md:p-10">
@@ -201,14 +201,14 @@ export default function Contact() {
               )}
             </div>
           </div>
+        </div>
 
-          <section className="mt-10 md:mt-12 rounded-sm overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl">
-            <div className="px-6 md:px-10 pt-8 md:pt-10 pb-6 border-b border-gray-100 dark:border-gray-800">
+        <section className="mt-10 md:mt-12 overflow-hidden border-y border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="pt-8 md:pt-10 pb-6 border-b border-gray-100 dark:border-gray-800">
               <h2 className="text-3xl md:text-4xl font-serif font-bold text-brand-navy dark:text-white">{t('visitOffice')}</h2>
               <p className="mt-3 text-sm md:text-base text-gray-600 dark:text-gray-300 leading-relaxed">{address}</p>
               <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 text-xs md:text-sm text-gray-500 dark:text-gray-400">
-                <span>{CONTACT_INFO.map.plusCode}</span>
-                <span>{CONTACT_INFO.map.coordinates}</span>
                 <a
                   href={CONTACT_INFO.map.directionUrl}
                   target="_blank"
@@ -220,16 +220,16 @@ export default function Contact() {
                 </a>
               </div>
             </div>
-            <iframe
-              src={CONTACT_INFO.map.embedUrl}
-              title="Dagrand Law Office Map Location"
-              className="w-full h-[360px] md:h-[420px] border-0"
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              allowFullScreen
-            />
-          </section>
-        </div>
+          </div>
+          <iframe
+            src={CONTACT_INFO.map.embedUrl}
+            title="Dagrand Law Office Map Location"
+            className="w-full h-[360px] md:h-[420px] border-0"
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+            allowFullScreen
+          />
+        </section>
       </div>
     </PageTransition>
   );
