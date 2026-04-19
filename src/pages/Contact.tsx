@@ -198,7 +198,7 @@ export default function Contact() {
                   className="inline-flex items-center gap-2 text-brand-navy dark:text-brand-gold hover:opacity-80 transition-opacity font-semibold"
                 >
                   <MapPin className="w-4 h-4" />
-                  Google Maps
+                  {t('openInGoogleMaps')}
                 </a>
               </div>
             </div>
