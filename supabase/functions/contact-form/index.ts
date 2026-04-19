@@ -178,7 +178,7 @@ serve(async (req) => {
 
     const text = `📩 <b>New Contact Message (dagrandv3)</b>\n\n👤 <b>Name:</b> ${safeName}\n📧 <b>Email:</b> ${safeEmail}\n📞 <b>Phone:</b> ${safePhone}\n📝 <b>Subject:</b> ${safeSubject}\n💬 <b>Message:</b>\n${safeMessage}`
 
-    const telegramMessageIds: Array<number | null> = []
+    const deliveryResults: Array<{ chatId: string; telegramMessageId: number | null }> = []
     for (const chatId of TELEGRAM_CHAT_IDS) {
       let lastError = "Failed to send telegram message"
       for (let attempt = 1; attempt <= TELEGRAM_MAX_ATTEMPTS; attempt += 1) {
@@ -215,7 +215,13 @@ serve(async (req) => {
               continue
             }
             return new Response(
-              JSON.stringify({ success: false, error: lastError, retryable: isRetryable }),
+              JSON.stringify({
+                success: false,
+                error: lastError,
+                retryable: isRetryable,
+                failedChatId: chatId,
+                deliveredChatIds: deliveryResults.map((result) => result.chatId),
+              }),
               {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: isRetryable ? 503 : 502,
@@ -245,7 +251,13 @@ serve(async (req) => {
               continue
             }
             return new Response(
-              JSON.stringify({ success: false, error: description, retryable: isRetryable }),
+              JSON.stringify({
+                success: false,
+                error: description,
+                retryable: isRetryable,
+                failedChatId: chatId,
+                deliveredChatIds: deliveryResults.map((result) => result.chatId),
+              }),
               {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: isRetryable ? 503 : 502,
@@ -253,7 +265,10 @@ serve(async (req) => {
             )
           }
 
-          telegramMessageIds.push(telegramResult?.result?.message_id ?? null)
+          deliveryResults.push({
+            chatId,
+            telegramMessageId: telegramResult?.result?.message_id ?? null,
+          })
           break
         } catch (telegramError: unknown) {
           const isAbortError =
@@ -270,7 +285,13 @@ serve(async (req) => {
             continue
           }
           return new Response(
-            JSON.stringify({ success: false, error: fallbackError, retryable: true }),
+            JSON.stringify({
+              success: false,
+              error: fallbackError,
+              retryable: true,
+              failedChatId: chatId,
+              deliveredChatIds: deliveryResults.map((result) => result.chatId),
+            }),
             {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 503,
@@ -286,7 +307,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         message: "Message sent successfully",
-        telegramMessageIds,
+        telegramDeliveries: deliveryResults,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
