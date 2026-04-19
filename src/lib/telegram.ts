@@ -23,10 +23,12 @@ const escapeHtml = (str: string) =>
 // Direct-to-Telegram path (no Supabase required)
 // Set VITE_TELEGRAM_BOT_TOKEN and optionally VITE_TELEGRAM_CHAT_ID in your
 // .env / .env.local file to use this simpler path.
+// Trade-off: the bot token is visible in the client bundle. This is acceptable
+// for a receive-only group bot but means the token must be treated as
+// low-privilege (revoke & re-issue from @BotFather if misused).
 // ---------------------------------------------------------------------------
-const DIRECT_BOT_TOKEN: string = (import.meta as any).env?.VITE_TELEGRAM_BOT_TOKEN ?? '';
-const DIRECT_CHAT_ID: string =
-  (import.meta as any).env?.VITE_TELEGRAM_CHAT_ID ?? '-1003986946717';
+const DIRECT_BOT_TOKEN: string = import.meta.env.VITE_TELEGRAM_BOT_TOKEN ?? '';
+const DIRECT_CHAT_ID: string = import.meta.env.VITE_TELEGRAM_CHAT_ID ?? '-1003986946717';
 const TELEGRAM_TIMEOUT_MS = 10_000;
 
 const sendDirect = async (payload: ReturnType<typeof buildPayload>): Promise<TelegramSendResult> => {
@@ -87,7 +89,7 @@ const sendDirect = async (payload: ReturnType<typeof buildPayload>): Promise<Tel
 // ---------------------------------------------------------------------------
 const sendViaEdgeFunction = async (payload: ReturnType<typeof buildPayload>): Promise<TelegramSendResult> => {
   if (!supabase) {
-    throw new Error('Contact service is unavailable. Please set VITE_TELEGRAM_BOT_TOKEN.');
+    throw new Error('Contact service is unavailable. Please configure Supabase or set VITE_TELEGRAM_BOT_TOKEN.');
   }
 
   const { data: result, error } = await supabase.functions.invoke('contact-form', { body: payload });
