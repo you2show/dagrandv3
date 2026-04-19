@@ -125,6 +125,98 @@ const buildPayload = (data: TelegramContactPayload) => ({
 });
 
 // ---------------------------------------------------------------------------
+// Test / Debug API
+// ---------------------------------------------------------------------------
+export type TelegramTestResult = {
+  ok: boolean;
+  steps: Array<{ label: string; ok: boolean; detail: string }>;
+};
+
+export const testTelegramConnection = async (): Promise<TelegramTestResult> => {
+  const steps: TelegramTestResult['steps'] = [];
+
+  // Step 1 – token configured?
+  const tokenConfigured = Boolean(DIRECT_BOT_TOKEN);
+  steps.push({
+    label: 'Bot token configured (VITE_TELEGRAM_BOT_TOKEN)',
+    ok: tokenConfigured,
+    detail: tokenConfigured
+      ? `Token present (${DIRECT_BOT_TOKEN.slice(0, 8)}…)`
+      : 'VITE_TELEGRAM_BOT_TOKEN is not set',
+  });
+
+  if (!tokenConfigured) {
+    return { ok: false, steps };
+  }
+
+  // Step 2 – validate token via getMe
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TELEGRAM_TIMEOUT_MS);
+  let getMeOk = false;
+  let botName = '';
+  try {
+    const res = await fetch(
+      `https://api.telegram.org/bot${DIRECT_BOT_TOKEN}/getMe`,
+      { signal: controller.signal }
+    );
+    clearTimeout(timeoutId);
+    const json = await res.json();
+    getMeOk = res.ok && json?.ok === true;
+    botName = json?.result?.username ? `@${json.result.username}` : '';
+    steps.push({
+      label: 'Bot token valid (getMe)',
+      ok: getMeOk,
+      detail: getMeOk
+        ? `Bot found: ${botName}`
+        : `Telegram error: ${json?.description ?? res.status}`,
+    });
+  } catch (err) {
+    clearTimeout(timeoutId);
+    const isTimeout = err instanceof Error && (err.name === 'AbortError' || err.name === 'TimeoutError');
+    steps.push({
+      label: 'Bot token valid (getMe)',
+      ok: false,
+      detail: isTimeout ? 'Request timed out' : 'Network error',
+    });
+    return { ok: false, steps };
+  }
+
+  if (!getMeOk) return { ok: false, steps };
+
+  // Step 3 – send a test message to the configured chat
+  const chatId = DIRECT_CHAT_ID;
+  steps.push({
+    label: `Chat ID reachable (${chatId})`,
+    ok: false,
+    detail: 'Sending test message…',
+  });
+  try {
+    const result = await sendDirect({
+      name: '',
+      email: '',
+      phone: '',
+      subject: '🔧 Test',
+      message: `✅ Telegram connection test from dagrandv3\nBot: ${botName}\nTime: ${new Date().toISOString()}`,
+    });
+    const msgId = result.telegramDeliveries[0]?.telegramMessageId;
+    steps[steps.length - 1] = {
+      label: `Chat ID reachable (${chatId})`,
+      ok: true,
+      detail: `Message delivered (id ${msgId ?? '?'})`,
+    };
+  } catch (err) {
+    steps[steps.length - 1] = {
+      label: `Chat ID reachable (${chatId})`,
+      ok: false,
+      detail: err instanceof Error ? err.message : 'Unknown error',
+    };
+    return { ok: false, steps };
+  }
+
+  return { ok: true, steps };
+};
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 export const sendTelegramMessage = async (data: TelegramContactPayload): Promise<TelegramSendResult> => {
