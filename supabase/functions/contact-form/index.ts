@@ -24,6 +24,8 @@ const TELEGRAM_TIMEOUT_MS = 8000
 const TELEGRAM_MAX_ATTEMPTS = 2
 const TELEGRAM_BASE_BACKOFF_MS = 500
 const TELEGRAM_RETRYABLE_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504])
+// Default fallback requested by project owner; can be overridden with
+// TELEGRAM_CHAT_IDS / TELEGRAM_CHAT_ID environment variables.
 const DEFAULT_TELEGRAM_GROUP_CHAT_ID = '-1003986946717'
 
 const normalizeField = (value: unknown, fallback = 'N/A', maxLength = 1000) => {
