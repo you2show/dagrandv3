@@ -12,6 +12,10 @@ export default function Contact() {
   const { t, getContent } = useLanguage();
   const address = getContent(CONTACT_INFO.address, CONTACT_INFO.address_cn);
   const businessHours = getContent(CONTACT_INFO.businessHours, CONTACT_INFO.businessHours_cn);
+  const mapEmbedUrl = 'https://www.google.com/maps?q=11.550368552320647,104.92719260695569&z=18&output=embed';
+  const mapDirectionUrl = 'https://maps.app.goo.gl/TT6XZ3YQzY2djwFo9';
+  const mapPlusCode = 'HW2G+4V Phnom Penh';
+  const mapCoordinates = '11.550368552320647, 104.92719260695569';
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -179,6 +183,34 @@ export default function Contact() {
               </form>
             </div>
           </div>
+
+          <section className="mt-10 md:mt-12 rounded-sm overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl">
+            <div className="px-6 md:px-10 pt-8 md:pt-10 pb-6 border-b border-gray-100 dark:border-gray-800">
+              <h2 className="text-3xl md:text-4xl font-serif font-bold text-brand-navy dark:text-white">{t('visitOffice')}</h2>
+              <p className="mt-3 text-sm md:text-base text-gray-600 dark:text-gray-300 leading-relaxed">{address}</p>
+              <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 text-xs md:text-sm text-gray-500 dark:text-gray-400">
+                <span>{mapPlusCode}</span>
+                <span>{mapCoordinates}</span>
+                <a
+                  href={mapDirectionUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-brand-navy dark:text-brand-gold hover:opacity-80 transition-opacity font-semibold"
+                >
+                  <MapPin className="w-4 h-4" />
+                  Google Maps
+                </a>
+              </div>
+            </div>
+            <iframe
+              src={mapEmbedUrl}
+              title="Dagrand Law Office Map Location"
+              className="w-full h-[360px] md:h-[420px] border-0"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              allowFullScreen
+            />
+          </section>
         </div>
       </div>
     </PageTransition>
