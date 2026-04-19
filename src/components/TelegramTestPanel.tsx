@@ -41,22 +41,23 @@ export const TelegramTestPanel: React.FC = () => {
       <div className="mb-6">
         <h3 className="text-lg font-serif font-bold text-brand-navy mb-1">Telegram Connection Test</h3>
         <p className="text-sm text-gray-500">
-          Validates your bot token and sends a test message to the configured group chat.
-          Check your Telegram group after running.
+          Validates the Supabase Edge Function configuration: bot token, chat reachability,
+          and bot membership. Check your Telegram group after running.
         </p>
       </div>
 
       {/* Config Summary */}
-      <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4 text-xs font-mono space-y-1">
-        <ConfigRow
-          label="VITE_TELEGRAM_BOT_TOKEN"
-          value={import.meta.env.VITE_TELEGRAM_BOT_TOKEN}
-          secret
-        />
-        <ConfigRow
-          label="VITE_TELEGRAM_CHAT_ID"
-          value={import.meta.env.VITE_TELEGRAM_CHAT_ID ?? '-1003986946717 (default)'}
-        />
+      <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 space-y-1">
+        <p>
+          Messages are routed via the <strong>Supabase Edge Function</strong>{' '}
+          (<code className="bg-gray-100 px-1 rounded text-xs">contact-form</code>).
+        </p>
+        <p className="text-xs text-gray-500 mt-1">
+          Configure <code className="bg-gray-100 px-1 rounded">TELEGRAM_BOT_TOKEN</code>,{' '}
+          <code className="bg-gray-100 px-1 rounded">TELEGRAM_CHAT_IDS</code>, and optionally{' '}
+          <code className="bg-gray-100 px-1 rounded">TELEGRAM_FALLBACK_CHAT_ID</code> in your
+          Supabase project&apos;s edge function secrets.
+        </p>
       </div>
 
       {/* Run Button */}
@@ -107,35 +108,6 @@ export const TelegramTestPanel: React.FC = () => {
           </ul>
         </div>
       )}
-    </div>
-  );
-};
-
-const TOKEN_VISIBLE_PREFIX_LENGTH = 8;
-
-const ConfigRow = ({
-  label,
-  value,
-  secret = false,
-}: {
-  label: string;
-  value?: string;
-  secret?: boolean;
-}) => {
-  const present = Boolean(value);
-  const display = present
-    ? secret
-      ? `${value!.slice(0, TOKEN_VISIBLE_PREFIX_LENGTH)}${'*'.repeat(Math.max(0, value!.length - TOKEN_VISIBLE_PREFIX_LENGTH))}`
-      : value!
-    : '(not set)';
-
-  return (
-    <div className="flex items-center gap-2">
-      <span className={`shrink-0 font-bold ${present ? 'text-green-600' : 'text-red-500'}`}>
-        {present ? '✓' : '✗'}
-      </span>
-      <span className="text-gray-500">{label}=</span>
-      <span className={present ? 'text-gray-800' : 'text-red-400 italic'}>{display}</span>
     </div>
   );
 };
