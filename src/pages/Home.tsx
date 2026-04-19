@@ -157,7 +157,7 @@ const Hero = () => {
                 transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                 className={`font-bold tracking-tight leading-tight drop-shadow-2xl text-white ${
                   isKhmer 
-                  ? 'font-[\'Moul\'] font-normal text-3xl md:text-5xl lg:text-6xl xl:text-7xl py-6 leading-relaxed tracking-normal' 
+                  ? 'font-moul font-normal text-3xl md:text-5xl lg:text-6xl xl:text-7xl py-6 leading-relaxed tracking-normal' 
                   : 'font-serif text-4xl md:text-6xl lg:text-7xl xl:text-8xl'
                 }`}
               >
