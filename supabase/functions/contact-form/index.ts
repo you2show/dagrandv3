@@ -21,7 +21,7 @@ if (allowedOrigins.length === 0) {
 }
 
 const TELEGRAM_TIMEOUT_MS = 8000
-const TELEGRAM_MAX_ATTEMPTS = 2
+const TELEGRAM_MAX_ATTEMPTS = 3
 const TELEGRAM_BASE_BACKOFF_MS = 500
 const TELEGRAM_RETRYABLE_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504])
 // Default fallback requested by project owner; can be overridden with
@@ -46,7 +46,7 @@ const escapeHtml = (value: string) => {
 }
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-const getBackoffMs = (attemptNumber: number) => attemptNumber * TELEGRAM_BASE_BACKOFF_MS
+const getBackoffMs = (attemptNumber: number) => Math.min(attemptNumber * TELEGRAM_BASE_BACKOFF_MS, 4000)
 const toRetryAfterMs = (seconds: unknown) =>
   typeof seconds === 'number' && Number.isFinite(seconds) && seconds > 0
     ? seconds * 1000
@@ -63,12 +63,7 @@ const parseTelegramError = async (response: Response) => {
           : 'Unknown Telegram API error'
       const errorCode = typeof parsed.error_code === 'number' ? parsed.error_code : response.status
       const retryAfterMs = toRetryAfterMs(parsed?.parameters?.retry_after)
-      return {
-        description,
-        errorCode,
-        retryAfterMs,
-        raw,
-      }
+      return { description, errorCode, retryAfterMs, raw }
     }
   } catch {
     // Fall through to non-JSON fallback.
@@ -82,6 +77,239 @@ const parseTelegramError = async (response: Response) => {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Send a single message to one Telegram chat with retry
+// ---------------------------------------------------------------------------
+type DeliverySuccess = { chatId: string; telegramMessageId: number | null }
+type DeliveryFailure = { chatId: string; error: string; retryable: boolean }
+
+async function sendToChat(
+  token: string,
+  chatId: string,
+  text: string,
+  correlationId: string,
+): Promise<{ sent: boolean; result?: DeliverySuccess; failure?: DeliveryFailure }> {
+  let lastError = 'Failed to send telegram message'
+  let lastRetryable = true
+
+  for (let attempt = 1; attempt <= TELEGRAM_MAX_ATTEMPTS; attempt += 1) {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), TELEGRAM_TIMEOUT_MS)
+    try {
+      const telegramResponse = await fetch(
+        `https://api.telegram.org/bot${token}/sendMessage`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text,
+            parse_mode: 'HTML',
+            disable_web_page_preview: true,
+          }),
+          signal: controller.signal,
+        },
+      )
+
+      if (!telegramResponse.ok) {
+        const parsedError = await parseTelegramError(telegramResponse)
+        lastError = parsedError.description
+        const isRetryable = TELEGRAM_RETRYABLE_STATUS.has(telegramResponse.status)
+        lastRetryable = isRetryable
+        console.error('telegram_send_failed', {
+          correlationId, chatId, attempt,
+          status: telegramResponse.status,
+          description: parsedError.description,
+          retryAfterMs: parsedError.retryAfterMs,
+        })
+        if (attempt < TELEGRAM_MAX_ATTEMPTS && isRetryable) {
+          await delay(parsedError.retryAfterMs ?? getBackoffMs(attempt))
+          continue
+        }
+        break
+      }
+
+      const telegramResult = await telegramResponse.json().catch(() => null)
+      if (!telegramResult || telegramResult.ok !== true) {
+        const description =
+          typeof telegramResult?.description === 'string' && telegramResult.description.trim()
+            ? telegramResult.description.trim()
+            : 'Telegram API returned an invalid success response'
+        const errorCode = typeof telegramResult?.error_code === 'number' ? telegramResult.error_code : 502
+        const retryAfterMs = toRetryAfterMs(telegramResult?.parameters?.retry_after)
+        lastError = description
+        const isRetryable = TELEGRAM_RETRYABLE_STATUS.has(errorCode)
+        lastRetryable = isRetryable
+        console.error('telegram_invalid_response', {
+          correlationId, chatId, attempt, errorCode, description, retryAfterMs,
+        })
+        if (attempt < TELEGRAM_MAX_ATTEMPTS && isRetryable) {
+          await delay(retryAfterMs ?? getBackoffMs(attempt))
+          continue
+        }
+        break
+      }
+
+      const messageId = telegramResult?.result?.message_id ?? null
+      console.log('telegram_send_ok', { correlationId, chatId, attempt, messageId })
+      return { sent: true, result: { chatId, telegramMessageId: messageId } }
+    } catch (telegramError: unknown) {
+      const isAbortError =
+        typeof telegramError === 'object' &&
+        telegramError !== null &&
+        (telegramError as { name?: string }).name === 'AbortError'
+      const fallbackError = isAbortError
+        ? 'Telegram request timed out'
+        : (telegramError instanceof Error ? telegramError.message : 'Telegram network request failed')
+      lastError = fallbackError
+      // Do NOT retry after a timeout (AbortError). The request was already
+      // in-flight for TELEGRAM_TIMEOUT_MS; Telegram may have processed it and
+      // retrying would deliver a duplicate message. Only retry on
+      // connection-level errors where the request never reached the Telegram API.
+      lastRetryable = !isAbortError
+      console.error('telegram_network_error', { correlationId, chatId, attempt, error: fallbackError, isAbortError })
+      if (attempt < TELEGRAM_MAX_ATTEMPTS && !isAbortError) {
+        await delay(getBackoffMs(attempt))
+        continue
+      }
+      break
+    } finally {
+      clearTimeout(timeoutId)
+    }
+  }
+
+  return { sent: false, failure: { chatId, error: lastError, retryable: lastRetryable } }
+}
+
+// ---------------------------------------------------------------------------
+// Health-check handler (GET) — validates bot token and each configured chat
+// ---------------------------------------------------------------------------
+type HealthStep = { label: string; ok: boolean; detail: string }
+
+async function handleHealthCheck(corsHeaders: Record<string, string>): Promise<Response> {
+  const steps: HealthStep[] = []
+  const TELEGRAM_BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN')
+  const tokenConfigured = Boolean(TELEGRAM_BOT_TOKEN)
+
+  steps.push({
+    label: 'Bot token configured (TELEGRAM_BOT_TOKEN)',
+    ok: tokenConfigured,
+    detail: tokenConfigured
+      ? `Token present (${TELEGRAM_BOT_TOKEN!.slice(0, 8)}…)`
+      : 'TELEGRAM_BOT_TOKEN is not set in Supabase Edge Function secrets',
+  })
+
+  if (!tokenConfigured) {
+    return new Response(
+      JSON.stringify({ ok: false, steps }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
+    )
+  }
+
+  // Validate token via getMe
+  const ctrl1 = new AbortController()
+  const tid1 = setTimeout(() => ctrl1.abort(), TELEGRAM_TIMEOUT_MS)
+  let getMeOk = false
+  let botUsername = ''
+  try {
+    const res = await fetch(
+      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe`,
+      { signal: ctrl1.signal },
+    )
+    clearTimeout(tid1)
+    const json = await res.json()
+    getMeOk = res.ok && json?.ok === true
+    botUsername = typeof json?.result?.username === 'string' ? `@${json.result.username}` : ''
+    steps.push({
+      label: 'Bot token valid (getMe)',
+      ok: getMeOk,
+      detail: getMeOk
+        ? `Bot found: ${botUsername}`
+        : `Telegram error: ${json?.description ?? res.status}`,
+    })
+  } catch (err) {
+    clearTimeout(tid1)
+    const isTimeout = err instanceof Error && err.name === 'AbortError'
+    steps.push({
+      label: 'Bot token valid (getMe)',
+      ok: false,
+      detail: isTimeout ? 'Request timed out' : 'Network error reaching Telegram API',
+    })
+    return new Response(
+      JSON.stringify({ ok: false, steps }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
+    )
+  }
+
+  if (!getMeOk) {
+    return new Response(
+      JSON.stringify({ ok: false, steps }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
+    )
+  }
+
+  // Check each configured chat ID
+  const TELEGRAM_CHAT_IDS_RAW =
+    Deno.env.get('TELEGRAM_CHAT_IDS') ??
+    Deno.env.get('TELEGRAM_CHAT_ID') ??
+    DEFAULT_TELEGRAM_GROUP_CHAT_ID
+  const primaryChatIds = TELEGRAM_CHAT_IDS_RAW
+    .split(',')
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0)
+
+  const FALLBACK_CHAT_ID = Deno.env.get('TELEGRAM_FALLBACK_CHAT_ID')?.trim() || null
+  const allChatIds = [...primaryChatIds]
+  if (FALLBACK_CHAT_ID && !allChatIds.includes(FALLBACK_CHAT_ID)) {
+    allChatIds.push(FALLBACK_CHAT_ID)
+  }
+
+  let allChatsOk = true
+  for (const chatId of allChatIds) {
+    const isFallback = FALLBACK_CHAT_ID === chatId && !primaryChatIds.includes(chatId)
+    const label = `Chat ID reachable (${chatId}${isFallback ? ' [fallback]' : ''})`
+    const ctrl2 = new AbortController()
+    const tid2 = setTimeout(() => ctrl2.abort(), TELEGRAM_TIMEOUT_MS)
+    try {
+      const res = await fetch(
+        `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getChat?chat_id=${encodeURIComponent(chatId)}`,
+        { signal: ctrl2.signal },
+      )
+      clearTimeout(tid2)
+      const json = await res.json()
+      const chatOk = res.ok && json?.ok === true
+      const title = json?.result?.title ?? json?.result?.username ?? '?'
+      const type = json?.result?.type ?? '?'
+      steps.push({
+        label,
+        ok: chatOk,
+        detail: chatOk
+          ? `${type}: ${title}`
+          : `Telegram error: ${json?.description ?? res.status}. Ensure the bot is added to the chat.`,
+      })
+      if (!chatOk) allChatsOk = false
+    } catch (err) {
+      clearTimeout(tid2)
+      const isTimeout = err instanceof Error && err.name === 'AbortError'
+      steps.push({
+        label,
+        ok: false,
+        detail: isTimeout ? 'Request timed out' : 'Network error reaching Telegram API',
+      })
+      allChatsOk = false
+    }
+  }
+
+  const ok = getMeOk && allChatsOk
+  return new Response(
+    JSON.stringify({ ok, steps }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Main handler
+// ---------------------------------------------------------------------------
 serve(async (req) => {
   const origin = req.headers.get('origin')
   const normalizedOrigin = origin ? normalizeOrigin(origin) : null
@@ -92,8 +320,8 @@ serve(async (req) => {
     (normalizedOrigin !== null && allowedOrigins.includes(normalizedOrigin))
   const corsHeaders: Record<string, string> = {
     'Vary': 'Origin',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-request-id, x-idempotency-key',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Max-Age': '86400',
   }
   if (allowOriginHeader) {
@@ -113,217 +341,167 @@ serve(async (req) => {
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 403,
-      }
+      },
     )
   }
+
+  // Health check (GET)
+  if (req.method === 'GET') {
+    return handleHealthCheck(corsHeaders)
+  }
+
+  // Message submission (POST)
+  const correlationId = req.headers.get('x-request-id') ?? crypto.randomUUID()
+  const responseHeaders = { ...corsHeaders, 'Content-Type': 'application/json', 'X-Correlation-ID': correlationId }
 
   try {
     const formData = await req.json()
     if (!formData || typeof formData !== 'object') {
-        return new Response(
-          JSON.stringify({ success: false, error: "invalid request payload" }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400,
-        }
+      return new Response(
+        JSON.stringify({ success: false, error: 'invalid request payload', correlationId }),
+        { headers: responseHeaders, status: 400 },
       )
     }
 
     const data = formData as Record<string, unknown>
+    const idempotencyKey = typeof data.idempotencyKey === 'string' ? data.idempotencyKey.trim() : null
     const name = normalizeField(data.name ?? data.fullName, 'N/A', 120)
     const email = normalizeField(data.email, 'N/A', 180)
     const phone = normalizeField(data.phone ?? data.phoneNumber, 'N/A', 80)
     const subject = normalizeField(data.subject, 'N/A', 200)
     const message = normalizeField(data.message, '', 3200)
 
+    console.log('contact_form_submission', {
+      correlationId,
+      idempotencyKey,
+      hasName: name !== 'N/A',
+      hasEmail: email !== 'N/A',
+      hasPhone: phone !== 'N/A',
+      hasSubject: subject !== 'N/A',
+      messageLength: message.length,
+    })
+
     if (!message) {
-        return new Response(
-          JSON.stringify({ success: false, error: "message is required" }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400,
-        }
+      return new Response(
+        JSON.stringify({ success: false, error: 'message is required', correlationId }),
+        { headers: responseHeaders, status: 400 },
       )
     }
 
-    const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN")
+    const TELEGRAM_BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN')
     const TELEGRAM_CHAT_IDS_RAW =
-      Deno.env.get("TELEGRAM_CHAT_IDS") ??
-      Deno.env.get("TELEGRAM_CHAT_ID") ??
+      Deno.env.get('TELEGRAM_CHAT_IDS') ??
+      Deno.env.get('TELEGRAM_CHAT_ID') ??
       DEFAULT_TELEGRAM_GROUP_CHAT_ID
     const TELEGRAM_CHAT_IDS = TELEGRAM_CHAT_IDS_RAW
-      .split(",")
+      .split(',')
       .map((chatId) => chatId.trim())
       .filter((chatId) => chatId.length > 0)
+    const TELEGRAM_FALLBACK_CHAT_ID = Deno.env.get('TELEGRAM_FALLBACK_CHAT_ID')?.trim() || null
 
     if (!TELEGRAM_BOT_TOKEN) {
+      console.error('telegram_not_configured', { correlationId })
       return new Response(
-        JSON.stringify({ success: false, error: "TELEGRAM_BOT_TOKEN is not configured" }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500,
-        }
+        JSON.stringify({ success: false, error: 'TELEGRAM_BOT_TOKEN is not configured', correlationId }),
+        { headers: responseHeaders, status: 500 },
       )
     }
 
     if (TELEGRAM_CHAT_IDS.length === 0) {
+      console.error('telegram_no_chats', { correlationId })
       return new Response(
-        JSON.stringify({ success: false, error: "TELEGRAM_CHAT_ID or TELEGRAM_CHAT_IDS is not configured" }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500,
-        }
+        JSON.stringify({ success: false, error: 'TELEGRAM_CHAT_ID or TELEGRAM_CHAT_IDS is not configured', correlationId }),
+        { headers: responseHeaders, status: 500 },
       )
     }
 
-    const safeName = escapeHtml(name)
-    const safeEmail = escapeHtml(email)
-    const safePhone = escapeHtml(phone)
-    const safeSubject = escapeHtml(subject)
-    const safeMessage = escapeHtml(message)
+    const text =
+      `📩 <b>New Contact Message (dagrandv3)</b>\n\n` +
+      `👤 <b>Name:</b> ${escapeHtml(name)}\n` +
+      `📧 <b>Email:</b> ${escapeHtml(email)}\n` +
+      `📞 <b>Phone:</b> ${escapeHtml(phone)}\n` +
+      `📝 <b>Subject:</b> ${escapeHtml(subject)}\n` +
+      `💬 <b>Message:</b>\n${escapeHtml(message)}`
 
-    const text = `📩 <b>New Contact Message (dagrandv3)</b>\n\n👤 <b>Name:</b> ${safeName}\n📧 <b>Email:</b> ${safeEmail}\n📞 <b>Phone:</b> ${safePhone}\n📝 <b>Subject:</b> ${safeSubject}\n💬 <b>Message:</b>\n${safeMessage}`
+    const successfulDeliveries: DeliverySuccess[] = []
+    const failedDeliveries: DeliveryFailure[] = []
 
-    const successfulDeliveries: Array<{ chatId: string; telegramMessageId: number | null }> = []
-    const failedDeliveries: Array<{ chatId: string; error: string; retryable: boolean }> = []
     for (const chatId of TELEGRAM_CHAT_IDS) {
-      let lastError = "Failed to send telegram message"
-      let lastRetryable = true
-      let sent = false
-      for (let attempt = 1; attempt <= TELEGRAM_MAX_ATTEMPTS; attempt += 1) {
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), TELEGRAM_TIMEOUT_MS)
-        try {
-          const telegramResponse = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              chat_id: chatId,
-              text,
-              parse_mode: 'HTML',
-              disable_web_page_preview: true,
-            }),
-            signal: controller.signal,
-          })
-
-          if (!telegramResponse.ok) {
-            const parsedError = await parseTelegramError(telegramResponse)
-            lastError = parsedError.description
-            const isRetryable = TELEGRAM_RETRYABLE_STATUS.has(telegramResponse.status)
-            lastRetryable = isRetryable
-            console.error("Failed to send telegram message", {
-              chatId,
-              attempt,
-              status: telegramResponse.status,
-              description: parsedError.description,
-              retryAfterMs: parsedError.retryAfterMs,
-            })
-            if (attempt < TELEGRAM_MAX_ATTEMPTS && isRetryable) {
-              await delay(parsedError.retryAfterMs ?? getBackoffMs(attempt))
-              continue
-            }
-            break
-          }
-
-          const telegramResult = await telegramResponse.json().catch(() => null)
-          if (!telegramResult || telegramResult.ok !== true) {
-            const description =
-              typeof telegramResult?.description === 'string' && telegramResult.description.trim()
-                ? telegramResult.description.trim()
-                : "Telegram API returned an invalid success response"
-            const errorCode = typeof telegramResult?.error_code === 'number' ? telegramResult.error_code : 502
-            const retryAfterMs = toRetryAfterMs(telegramResult?.parameters?.retry_after)
-            lastError = description
-            const isRetryable = TELEGRAM_RETRYABLE_STATUS.has(errorCode)
-            lastRetryable = isRetryable
-            console.error("Telegram API returned non-success payload", {
-              chatId,
-              attempt,
-              errorCode,
-              description,
-              retryAfterMs,
-            })
-            if (attempt < TELEGRAM_MAX_ATTEMPTS && isRetryable) {
-              await delay(retryAfterMs ?? getBackoffMs(attempt))
-              continue
-            }
-            break
-          }
-
-          successfulDeliveries.push({
-            chatId,
-            telegramMessageId: telegramResult?.result?.message_id ?? null,
-          })
-          sent = true
-          break
-        } catch (telegramError: unknown) {
-          const isAbortError =
-            typeof telegramError === 'object' &&
-            telegramError !== null &&
-            (telegramError as { name?: string }).name === 'AbortError'
-          const fallbackError = isAbortError
-            ? "Telegram request timed out"
-            : (telegramError instanceof Error ? telegramError.message : "Telegram network request failed")
-          lastError = fallbackError
-          // Do NOT retry after a timeout (AbortError). The request was
-          // already in-flight for TELEGRAM_TIMEOUT_MS; Telegram may have
-          // processed it and retrying would deliver a duplicate message.
-          // Only retry on connection-level errors where the request never
-          // reached the Telegram API.
-          lastRetryable = !isAbortError
-          console.error("Telegram network error", { chatId, attempt, error: fallbackError, isAbortError })
-          if (attempt < TELEGRAM_MAX_ATTEMPTS && !isAbortError) {
-            await delay(getBackoffMs(attempt))
-            continue
-          }
-          break
-        } finally {
-          clearTimeout(timeoutId)
-        }
-      }
-
-      if (!sent) {
-        failedDeliveries.push({ chatId, error: lastError, retryable: lastRetryable })
+      const { sent, result, failure } = await sendToChat(TELEGRAM_BOT_TOKEN, chatId, text, correlationId)
+      if (sent && result) {
+        successfulDeliveries.push(result)
+      } else if (failure) {
+        failedDeliveries.push(failure)
       }
     }
 
-    if (failedDeliveries.length > 0) {
-      const hasRetryableFailure = failedDeliveries.some((failure) => failure.retryable)
+    // If every primary chat failed and a separate fallback chat is configured, try it.
+    if (
+      failedDeliveries.length === TELEGRAM_CHAT_IDS.length &&
+      TELEGRAM_FALLBACK_CHAT_ID &&
+      !TELEGRAM_CHAT_IDS.includes(TELEGRAM_FALLBACK_CHAT_ID)
+    ) {
+      console.warn('telegram_trying_fallback', { correlationId, fallbackChatId: TELEGRAM_FALLBACK_CHAT_ID })
+      const { sent, result, failure } = await sendToChat(
+        TELEGRAM_BOT_TOKEN, TELEGRAM_FALLBACK_CHAT_ID, text, correlationId,
+      )
+      if (sent && result) {
+        successfulDeliveries.push(result)
+        console.log('telegram_fallback_ok', { correlationId, fallbackChatId: TELEGRAM_FALLBACK_CHAT_ID })
+      } else if (failure) {
+        failedDeliveries.push(failure)
+        console.error('telegram_fallback_failed', { correlationId, fallbackChatId: TELEGRAM_FALLBACK_CHAT_ID })
+      }
+    }
+
+    if (successfulDeliveries.length === 0) {
+      const hasRetryableFailure = failedDeliveries.some((f) => f.retryable)
+      console.error('telegram_all_failed', { correlationId, failedDeliveries })
       return new Response(
         JSON.stringify({
           success: false,
-          error: "Failed to deliver message to one or more Telegram chats",
+          error: 'Failed to deliver message to one or more Telegram chats',
           retryable: hasRetryableFailure,
-          deliveredChatIds: successfulDeliveries.map((result) => result.chatId),
+          deliveredChatIds: [],
           failedDeliveries,
+          correlationId,
         }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: hasRetryableFailure ? 503 : 502,
-        }
+        { headers: responseHeaders, status: hasRetryableFailure ? 503 : 502 },
       )
     }
 
+    if (failedDeliveries.length > 0) {
+      const hasRetryableFailure = failedDeliveries.some((f) => f.retryable)
+      console.warn('telegram_partial_success', { correlationId, successfulDeliveries, failedDeliveries })
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Failed to deliver message to one or more Telegram chats',
+          retryable: hasRetryableFailure,
+          deliveredChatIds: successfulDeliveries.map((r) => r.chatId),
+          failedDeliveries,
+          correlationId,
+        }),
+        { headers: responseHeaders, status: hasRetryableFailure ? 503 : 502 },
+      )
+    }
+
+    console.log('telegram_all_ok', { correlationId, successfulDeliveries })
     return new Response(
       JSON.stringify({
         success: true,
-        message: "Message sent successfully",
+        message: 'Message sent successfully',
         telegramDeliveries: successfulDeliveries,
+        correlationId,
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
+      { headers: responseHeaders, status: 200 },
     )
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Invalid request'
+    console.error('contact_form_error', { correlationId, error: message })
     return new Response(
-      JSON.stringify({ success: false, error: error?.message || "Invalid request" }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      }
+      JSON.stringify({ success: false, error: message, correlationId }),
+      { headers: responseHeaders, status: 400 },
     )
   }
 })

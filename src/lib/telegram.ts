@@ -12,104 +12,59 @@ export type TelegramSendResult = {
   success: true;
   message: string;
   telegramDeliveries: Array<{ chatId: string; telegramMessageId: number | null }>;
+  correlationId?: string;
 };
 
 const normalize = (value?: string) => value?.trim() || '';
 
-const escapeHtml = (str: string) =>
-  str.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c] ?? c));
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+const buildPayload = (data: TelegramContactPayload) => ({
+  name: normalize(data.name),
+  email: normalize(data.email),
+  phone: normalize(data.phone),
+  subject: normalize(data.subject),
+  message: normalize(data.message),
+  // Idempotency key: unique per submission, used for logging/tracing server-side.
+  idempotencyKey: crypto.randomUUID(),
+});
 
-type TelegramApiResponse = {
-  ok: boolean;
-  result?: { message_id?: number; username?: string; [key: string]: unknown };
-  description?: string;
+// Extract the most useful error message from a Supabase functions.invoke error.
+const extractEdgeFunctionError = async (
+  error: { message?: string; context?: unknown },
+): Promise<string> => {
+  let msg = error.message || 'Failed to send message.';
+  const context = error.context as Response | undefined;
+  if (context) {
+    try {
+      const ctx = await context.clone().json();
+      if (typeof ctx?.error === 'string' && ctx.error.trim()) msg = ctx.error.trim();
+    } catch { /* keep fallback */ }
+  }
+  return msg;
 };
 
 // ---------------------------------------------------------------------------
-// Direct-to-Telegram path (no Supabase required)
-// Set VITE_TELEGRAM_BOT_TOKEN and optionally VITE_TELEGRAM_CHAT_ID in your
-// .env / .env.local file to use this simpler path.
-// Trade-off: the bot token is visible in the client bundle. This is acceptable
-// for a receive-only group bot but means the token must be treated as
-// low-privilege (revoke & re-issue from @BotFather if misused).
-// ---------------------------------------------------------------------------
-const DEFAULT_CHAT_ID = '-1003986946717';
-const DIRECT_BOT_TOKEN: string = import.meta.env.VITE_TELEGRAM_BOT_TOKEN ?? '';
-const DIRECT_CHAT_ID: string = import.meta.env.VITE_TELEGRAM_CHAT_ID ?? DEFAULT_CHAT_ID;
-const TELEGRAM_TIMEOUT_MS = 10_000;
-
-const sendDirect = async (payload: ReturnType<typeof buildPayload>): Promise<TelegramSendResult> => {
-  const text =
-    `📩 <b>New Contact Message (dagrandv3)</b>\n\n` +
-    `👤 <b>Name:</b> ${escapeHtml(payload.name || 'N/A')}\n` +
-    `📧 <b>Email:</b> ${escapeHtml(payload.email || 'N/A')}\n` +
-    `📝 <b>Subject:</b> ${escapeHtml(payload.subject || 'N/A')}\n` +
-    `💬 <b>Message:</b>\n${escapeHtml(payload.message)}`;
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TELEGRAM_TIMEOUT_MS);
-
-  let response: Response;
-  try {
-    response = await fetch(
-      `https://api.telegram.org/bot${DIRECT_BOT_TOKEN}/sendMessage`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: DIRECT_CHAT_ID,
-          text,
-          parse_mode: 'HTML',
-          disable_web_page_preview: true,
-        }),
-        signal: controller.signal,
-      }
-    );
-  } catch (err) {
-    const isTimeout =
-      err instanceof Error && (err.name === 'AbortError' || err.name === 'TimeoutError');
-    throw new Error(isTimeout ? 'Request timed out. Please try again.' : 'Network error. Please check your connection.');
-  } finally {
-    clearTimeout(timeoutId);
-  }
-
-  let json: TelegramApiResponse | null;
-  try { json = await response.json() as TelegramApiResponse; } catch { json = null; }
-
-  if (!response.ok || !json?.ok) {
-    const desc: string =
-      typeof json?.description === 'string' && json.description.trim()
-        ? json.description.trim()
-        : `Telegram error ${response.status}`;
-    throw new Error(desc);
-  }
-
-  return {
-    success: true,
-    message: 'Message sent successfully',
-    telegramDeliveries: [{ chatId: DIRECT_CHAT_ID, telegramMessageId: json?.result?.message_id ?? null }],
-  };
-};
-
-// ---------------------------------------------------------------------------
-// Supabase Edge Function path (fallback)
+// Supabase Edge Function path (single production path)
+// All contact form submissions are routed through the Edge Function so that
+// the Telegram bot token is never exposed in the client bundle and retry /
+// logging / fallback logic lives in one place.
 // ---------------------------------------------------------------------------
 const sendViaEdgeFunction = async (payload: ReturnType<typeof buildPayload>): Promise<TelegramSendResult> => {
   if (!supabase) {
-    throw new Error('Contact service is unavailable. Please configure Supabase or set VITE_TELEGRAM_BOT_TOKEN.');
+    throw new Error('Contact service is unavailable. Please check Supabase configuration.');
   }
 
-  const { data: result, error } = await supabase.functions.invoke('contact-form', { body: payload });
+  const { data: result, error } = await supabase.functions.invoke('contact-form', {
+    body: payload,
+    headers: { 'x-request-id': payload.idempotencyKey },
+  });
 
   if (error) {
-    let msg = error.message || 'Failed to send message.';
-    const context = (error as { context?: Response }).context;
-    if (context) {
-      try {
-        const ctx = await context.clone().json();
-        if (typeof ctx?.error === 'string' && ctx.error.trim()) msg = ctx.error.trim();
-      } catch { /* keep fallback */ }
-    }
+    const msg = await extractEdgeFunctionError(
+      error as { message?: string; context?: unknown },
+    );
     throw new Error(msg);
   }
 
@@ -121,17 +76,6 @@ const sendViaEdgeFunction = async (payload: ReturnType<typeof buildPayload>): Pr
 };
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-const buildPayload = (data: TelegramContactPayload) => ({
-  name: normalize(data.name),
-  email: normalize(data.email),
-  phone: normalize(data.phone),
-  subject: normalize(data.subject),
-  message: normalize(data.message),
-});
-
-// ---------------------------------------------------------------------------
 // Test / Debug API
 // ---------------------------------------------------------------------------
 export type TelegramTestResult = {
@@ -140,87 +84,57 @@ export type TelegramTestResult = {
 };
 
 export const testTelegramConnection = async (): Promise<TelegramTestResult> => {
-  const steps: TelegramTestResult['steps'] = [];
-
-  // Step 1 – token configured?
-  const tokenConfigured = Boolean(DIRECT_BOT_TOKEN);
-  steps.push({
-    label: 'Bot token configured (VITE_TELEGRAM_BOT_TOKEN)',
-    ok: tokenConfigured,
-    detail: tokenConfigured
-      ? `Token present (${DIRECT_BOT_TOKEN.slice(0, 8)}…)`
-      : 'VITE_TELEGRAM_BOT_TOKEN is not set',
-  });
-
-  if (!tokenConfigured) {
-    return { ok: false, steps };
-  }
-
-  // Step 2 – validate token via getMe
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TELEGRAM_TIMEOUT_MS);
-  let getMeOk = false;
-  let botName = '';
-  try {
-    const res = await fetch(
-      `https://api.telegram.org/bot${DIRECT_BOT_TOKEN}/getMe`,
-      { signal: controller.signal }
-    );
-    clearTimeout(timeoutId);
-    const json = await res.json() as TelegramApiResponse;
-    getMeOk = res.ok && json?.ok === true;
-    botName = typeof json?.result?.username === 'string' ? `@${json.result.username}` : '';
-    steps.push({
-      label: 'Bot token valid (getMe)',
-      ok: getMeOk,
-      detail: getMeOk
-        ? `Bot found: ${botName}`
-        : `Telegram error: ${json?.description ?? res.status}`,
-    });
-  } catch (err) {
-    clearTimeout(timeoutId);
-    const isTimeout = err instanceof Error && (err.name === 'AbortError' || err.name === 'TimeoutError');
-    steps.push({
-      label: 'Bot token valid (getMe)',
+  // Step 1: verify Supabase client is ready
+  if (!supabase) {
+    return {
       ok: false,
-      detail: isTimeout ? 'Request timed out' : 'Network error',
-    });
-    return { ok: false, steps };
+      steps: [{
+        label: 'Supabase client initialized',
+        ok: false,
+        detail: 'Supabase is not configured. VITE_SUPABASE_ANON_KEY must be a valid JWT (eyJ…).',
+      }],
+    };
   }
 
-  if (!getMeOk) return { ok: false, steps };
+  const steps: TelegramTestResult['steps'] = [{
+    label: 'Supabase client initialized',
+    ok: true,
+    detail: 'Supabase client is ready. Calling edge function health check…',
+  }];
 
-  // Step 3 – send a test message to the configured chat
-  const chatId = DIRECT_CHAT_ID;
-  steps.push({
-    label: `Chat ID reachable (${chatId})`,
-    ok: false,
-    detail: 'Sending test message…',
-  });
+  // Step 2+: delegate to the Edge Function's GET health-check endpoint which
+  // validates the bot token, calls getMe, and probes each configured chat.
   try {
-    const result = await sendDirect({
-      name: '',
-      email: '',
-      phone: '',
-      subject: '🔧 Test',
-      message: `✅ Telegram connection test from dagrandv3\nBot: ${botName}\nTime: ${new Date().toISOString()}`,
+    const { data, error } = await (supabase.functions as any).invoke('contact-form', {
+      method: 'GET',
     });
-    const msgId = result.telegramDeliveries[0]?.telegramMessageId;
-    steps[steps.length - 1] = {
-      label: `Chat ID reachable (${chatId})`,
-      ok: true,
-      detail: `Message delivered (id ${msgId ?? '?'})`,
-    };
+
+    if (error) {
+      const msg = await extractEdgeFunctionError(
+        error as { message?: string; context?: unknown },
+      );
+      steps.push({ label: 'Edge function health check', ok: false, detail: msg });
+      return { ok: false, steps };
+    }
+
+    if (data && Array.isArray(data.steps)) {
+      return { ok: Boolean(data.ok), steps: [...steps, ...data.steps] };
+    }
+
+    steps.push({
+      label: 'Edge function health check',
+      ok: false,
+      detail: 'Unexpected response from edge function.',
+    });
+    return { ok: false, steps };
   } catch (err) {
-    steps[steps.length - 1] = {
-      label: `Chat ID reachable (${chatId})`,
+    steps.push({
+      label: 'Edge function health check',
       ok: false,
       detail: err instanceof Error ? err.message : 'Unknown error',
-    };
+    });
     return { ok: false, steps };
   }
-
-  return { ok: true, steps };
 };
 
 // ---------------------------------------------------------------------------
@@ -233,11 +147,5 @@ export const sendTelegramMessage = async (data: TelegramContactPayload): Promise
     throw new Error('Message is required.');
   }
 
-  // Use direct Telegram API call when bot token is configured — no Supabase needed.
-  if (DIRECT_BOT_TOKEN) {
-    return sendDirect(payload);
-  }
-
-  // Fallback: route through Supabase Edge Function.
   return sendViaEdgeFunction(payload);
 };
