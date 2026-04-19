@@ -10,7 +10,12 @@ export type TelegramContactPayload = {
 
 const normalize = (value?: string) => value?.trim() || '';
 
-export const sendTelegramMessage = async (data: TelegramContactPayload) => {
+// No automatic client-side retries. The edge function already retries
+// internally for transient Telegram API errors. Retrying from the client
+// risks duplicate messages: if the edge function sent successfully but the
+// HTTP response was lost in transit, a client retry would send a second
+// identical message to Telegram.
+export const sendTelegramMessage = async (data: TelegramContactPayload): Promise<unknown> => {
   if (!supabase) {
     throw new Error('Contact service is unavailable right now.');
   }
@@ -27,62 +32,29 @@ export const sendTelegramMessage = async (data: TelegramContactPayload) => {
     throw new Error('Message is required.');
   }
 
-  const maxAttempts = 2;
-  let lastError = 'Failed to send Telegram message';
+  const { data: result, error } = await supabase.functions.invoke('contact-form', {
+    body: payload,
+  });
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const { data: result, error } = await supabase.functions.invoke('contact-form', {
-      body: payload
-    });
-
-    if (!error && result?.success) {
-      return result;
-    }
-
-    let message = lastError;
-
-    let responseStatus: number | null = null;
-    let responseRetryable = false;
-
-    if (error) {
-      message = error.message || message;
-      const context = (error as { context?: Response }).context;
-      if (context) {
-        responseStatus = context.status;
-        try {
-          const contextPayload = await context.clone().json();
-          if (typeof contextPayload?.error === 'string' && contextPayload.error.trim()) {
-            message = contextPayload.error.trim();
-          }
-          if (contextPayload?.retryable === true) {
-            responseRetryable = true;
-          }
-        } catch {
-          // Keep fallback error message.
+  if (error) {
+    let message = error.message || 'Failed to send message.';
+    const context = (error as { context?: Response }).context;
+    if (context) {
+      try {
+        const contextPayload = await context.clone().json();
+        if (typeof contextPayload?.error === 'string' && contextPayload.error.trim()) {
+          message = contextPayload.error.trim();
         }
+      } catch {
+        // Keep fallback error message.
       }
-    } else if (result && !result.success) {
-      message = result.error || message;
-      responseRetryable = result.retryable === true;
     }
-
-    const isEdgeRequestError =
-      (error as { name?: string } | null)?.name === 'FunctionsFetchError';
-    const isRetryableStatus = responseStatus !== null && responseStatus >= 500;
-    const isRetryableMessage =
-      /network|fetch|timeout|502|503|504|temporary|temporarily|unavailable|try again|rate limit/i.test(message);
-
-    lastError = isEdgeRequestError
-      ? 'Delivery status is unknown because of a network response issue. Please retry once only if you did not receive confirmation.'
-      : message;
-    const shouldRetry =
-      isEdgeRequestError || responseRetryable || isRetryableStatus || isRetryableMessage;
-    if (attempt < maxAttempts && shouldRetry) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      continue;
-    }
-    break;
+    throw new Error(message);
   }
 
-  throw new Error(lastError);
+  if (!result?.success) {
+    throw new Error(result?.error || 'Failed to send message. Please try again.');
+  }
+
+  return result;
 };

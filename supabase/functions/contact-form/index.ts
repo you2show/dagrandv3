@@ -21,7 +21,7 @@ if (allowedOrigins.length === 0) {
 }
 
 const TELEGRAM_TIMEOUT_MS = 8000
-const TELEGRAM_MAX_ATTEMPTS = 3
+const TELEGRAM_MAX_ATTEMPTS = 2
 const TELEGRAM_BASE_BACKOFF_MS = 500
 const TELEGRAM_RETRYABLE_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504])
 
@@ -261,9 +261,14 @@ serve(async (req) => {
             ? "Telegram request timed out"
             : (telegramError instanceof Error ? telegramError.message : "Telegram network request failed")
           lastError = fallbackError
-          lastRetryable = true
-          console.error("Telegram network error", { chatId, attempt, error: fallbackError })
-          if (attempt < TELEGRAM_MAX_ATTEMPTS) {
+          // Do NOT retry after a timeout (AbortError). The request was
+          // already in-flight for TELEGRAM_TIMEOUT_MS; Telegram may have
+          // processed it and retrying would deliver a duplicate message.
+          // Only retry on connection-level errors where the request never
+          // reached the Telegram API.
+          lastRetryable = !isAbortError
+          console.error("Telegram network error", { chatId, attempt, error: fallbackError, isAbortError })
+          if (attempt < TELEGRAM_MAX_ATTEMPTS && !isAbortError) {
             await delay(getBackoffMs(attempt))
             continue
           }
