@@ -111,6 +111,8 @@ export const TelegramTestPanel: React.FC = () => {
   );
 };
 
+const TOKEN_VISIBLE_PREFIX_LENGTH = 8;
+
 const ConfigRow = ({
   label,
   value,
@@ -123,7 +125,7 @@ const ConfigRow = ({
   const present = Boolean(value);
   const display = present
     ? secret
-      ? `${value!.slice(0, 8)}${'*'.repeat(Math.max(0, value!.length - 8))}`
+      ? `${value!.slice(0, TOKEN_VISIBLE_PREFIX_LENGTH)}${'*'.repeat(Math.max(0, value!.length - TOKEN_VISIBLE_PREFIX_LENGTH))}`
       : value!
     : '(not set)';
 

@@ -19,6 +19,12 @@ const normalize = (value?: string) => value?.trim() || '';
 const escapeHtml = (str: string) =>
   str.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c] ?? c));
 
+type TelegramApiResponse = {
+  ok: boolean;
+  result?: { message_id?: number; username?: string; [key: string]: unknown };
+  description?: string;
+};
+
 // ---------------------------------------------------------------------------
 // Direct-to-Telegram path (no Supabase required)
 // Set VITE_TELEGRAM_BOT_TOKEN and optionally VITE_TELEGRAM_CHAT_ID in your
@@ -27,8 +33,9 @@ const escapeHtml = (str: string) =>
 // for a receive-only group bot but means the token must be treated as
 // low-privilege (revoke & re-issue from @BotFather if misused).
 // ---------------------------------------------------------------------------
+const DEFAULT_CHAT_ID = '-1003986946717';
 const DIRECT_BOT_TOKEN: string = import.meta.env.VITE_TELEGRAM_BOT_TOKEN ?? '';
-const DIRECT_CHAT_ID: string = import.meta.env.VITE_TELEGRAM_CHAT_ID ?? '-1003986946717';
+const DIRECT_CHAT_ID: string = import.meta.env.VITE_TELEGRAM_CHAT_ID ?? DEFAULT_CHAT_ID;
 const TELEGRAM_TIMEOUT_MS = 10_000;
 
 const sendDirect = async (payload: ReturnType<typeof buildPayload>): Promise<TelegramSendResult> => {
@@ -66,8 +73,8 @@ const sendDirect = async (payload: ReturnType<typeof buildPayload>): Promise<Tel
     clearTimeout(timeoutId);
   }
 
-  let json: any;
-  try { json = await response.json(); } catch { json = null; }
+  let json: TelegramApiResponse | null;
+  try { json = await response.json() as TelegramApiResponse; } catch { json = null; }
 
   if (!response.ok || !json?.ok) {
     const desc: string =
@@ -160,9 +167,9 @@ export const testTelegramConnection = async (): Promise<TelegramTestResult> => {
       { signal: controller.signal }
     );
     clearTimeout(timeoutId);
-    const json = await res.json();
+    const json = await res.json() as TelegramApiResponse;
     getMeOk = res.ok && json?.ok === true;
-    botName = json?.result?.username ? `@${json.result.username}` : '';
+    botName = typeof json?.result?.username === 'string' ? `@${json.result.username}` : '';
     steps.push({
       label: 'Bot token valid (getMe)',
       ok: getMeOk,
