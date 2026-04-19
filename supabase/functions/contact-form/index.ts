@@ -315,9 +315,13 @@ serve(async (req) => {
   const normalizedOrigin = origin ? normalizeOrigin(origin) : null
   const allowOriginHeader =
     normalizedOrigin ?? (allowedOrigins.length === 0 ? '*' : null)
+  // Requests without an Origin header are non-browser calls (e.g. Supabase
+  // Dashboard test tool, curl, server-to-server). CORS is a browser security
+  // mechanism and does not apply to these — always allow them through.
   const isOriginAllowed =
+    normalizedOrigin === null ||
     allowedOrigins.length === 0 ||
-    (normalizedOrigin !== null && allowedOrigins.includes(normalizedOrigin))
+    allowedOrigins.includes(normalizedOrigin)
   const corsHeaders: Record<string, string> = {
     'Vary': 'Origin',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-request-id, x-idempotency-key',
