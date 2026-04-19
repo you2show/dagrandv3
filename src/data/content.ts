@@ -89,7 +89,7 @@ export const CONTACT_INFO = {
   map: {
     latitude: OFFICE_MAP_LATITUDE,
     longitude: OFFICE_MAP_LONGITUDE,
-    embedUrl: `https://www.google.com/maps?q=${OFFICE_MAP_LATITUDE},${OFFICE_MAP_LONGITUDE}&z=${OFFICE_MAP_ZOOM}&output=embed`,
+    embedUrl: `https://maps.google.com/maps?q=${OFFICE_MAP_LATITUDE},${OFFICE_MAP_LONGITUDE}+(Dagrand+Law+Office)&z=${OFFICE_MAP_ZOOM}&iwloc=B&output=embed`,
     directionUrl: "https://maps.app.goo.gl/TT6XZ3YQzY2djwFo9",
     plusCode: "HW2G+4V Phnom Penh",
     coordinates: `${OFFICE_MAP_LATITUDE}, ${OFFICE_MAP_LONGITUDE}`
