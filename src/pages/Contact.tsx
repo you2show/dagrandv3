@@ -45,7 +45,8 @@ export default function Contact() {
         message: formData.message.trim()
       });
       // Mark as submitted so the form is replaced by the success panel.
-      // This prevents the user from accidentally re-submitting.
+      // Keep submittingRef.current = true so any race-condition click while
+      // the success panel is still rendering cannot trigger a second send.
       setSubmitted(true);
     } catch (err: unknown) {
       console.error('Error sending message:', err);
@@ -71,8 +72,9 @@ export default function Contact() {
         ),
         { duration: 5000 }
       );
-    } finally {
+      // Release the lock only on failure so the user can try again.
       submittingRef.current = false;
+    } finally {
       setLoading(false);
     }
   };
@@ -156,6 +158,17 @@ export default function Contact() {
                   <p className="text-gray-600 dark:text-gray-300 max-w-sm text-base leading-relaxed">
                     Thank you for reaching out. Our legal team will review your message and contact you shortly.
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSubmitted(false);
+                      submittingRef.current = false;
+                      setFormData({ fullName: '', email: '', subject: '', message: '' });
+                    }}
+                    className="mt-2 text-sm text-brand-navy dark:text-brand-gold underline underline-offset-4 hover:opacity-70 transition-opacity"
+                  >
+                    Send another message
+                  </button>
                 </motion.div>
               ) : (
                 <>

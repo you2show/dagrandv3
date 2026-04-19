@@ -8,6 +8,12 @@ export type TelegramContactPayload = {
   message: string;
 };
 
+export type TelegramSendResult = {
+  success: true;
+  message: string;
+  telegramDeliveries: Array<{ chatId: string; telegramMessageId: number | null }>;
+};
+
 const normalize = (value?: string) => value?.trim() || '';
 
 // No automatic client-side retries. The edge function already retries
@@ -15,7 +21,7 @@ const normalize = (value?: string) => value?.trim() || '';
 // risks duplicate messages: if the edge function sent successfully but the
 // HTTP response was lost in transit, a client retry would send a second
 // identical message to Telegram.
-export const sendTelegramMessage = async (data: TelegramContactPayload): Promise<unknown> => {
+export const sendTelegramMessage = async (data: TelegramContactPayload): Promise<TelegramSendResult> => {
   if (!supabase) {
     throw new Error('Contact service is unavailable right now.');
   }
@@ -56,5 +62,5 @@ export const sendTelegramMessage = async (data: TelegramContactPayload): Promise
     throw new Error(result?.error || 'Failed to send message. Please try again.');
   }
 
-  return result;
+  return result as TelegramSendResult;
 };
