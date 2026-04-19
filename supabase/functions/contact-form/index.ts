@@ -178,9 +178,12 @@ serve(async (req) => {
 
     const text = `📩 <b>New Contact Message (dagrandv3)</b>\n\n👤 <b>Name:</b> ${safeName}\n📧 <b>Email:</b> ${safeEmail}\n📞 <b>Phone:</b> ${safePhone}\n📝 <b>Subject:</b> ${safeSubject}\n💬 <b>Message:</b>\n${safeMessage}`
 
-    const deliveryResults: Array<{ chatId: string; telegramMessageId: number | null }> = []
+    const successfulDeliveries: Array<{ chatId: string; telegramMessageId: number | null }> = []
+    const failedDeliveries: Array<{ chatId: string; error: string; retryable: boolean }> = []
     for (const chatId of TELEGRAM_CHAT_IDS) {
       let lastError = "Failed to send telegram message"
+      let lastRetryable = true
+      let sent = false
       for (let attempt = 1; attempt <= TELEGRAM_MAX_ATTEMPTS; attempt += 1) {
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), TELEGRAM_TIMEOUT_MS)
@@ -203,6 +206,7 @@ serve(async (req) => {
             const parsedError = await parseTelegramError(telegramResponse)
             lastError = parsedError.description
             const isRetryable = TELEGRAM_RETRYABLE_STATUS.has(telegramResponse.status)
+            lastRetryable = isRetryable
             console.error("Failed to send telegram message", {
               chatId,
               attempt,
@@ -214,19 +218,7 @@ serve(async (req) => {
               await delay(parsedError.retryAfterMs ?? getBackoffMs(attempt))
               continue
             }
-            return new Response(
-              JSON.stringify({
-                success: false,
-                error: lastError,
-                retryable: isRetryable,
-                failedChatId: chatId,
-                deliveredChatIds: deliveryResults.map((result) => result.chatId),
-              }),
-              {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: isRetryable ? 503 : 502,
-              }
-            )
+            break
           }
 
           const telegramResult = await telegramResponse.json().catch(() => null)
@@ -239,6 +231,7 @@ serve(async (req) => {
             const retryAfterMs = toRetryAfterMs(telegramResult?.parameters?.retry_after)
             lastError = description
             const isRetryable = TELEGRAM_RETRYABLE_STATUS.has(errorCode)
+            lastRetryable = isRetryable
             console.error("Telegram API returned non-success payload", {
               chatId,
               attempt,
@@ -250,25 +243,14 @@ serve(async (req) => {
               await delay(retryAfterMs ?? getBackoffMs(attempt))
               continue
             }
-            return new Response(
-              JSON.stringify({
-                success: false,
-                error: description,
-                retryable: isRetryable,
-                failedChatId: chatId,
-                deliveredChatIds: deliveryResults.map((result) => result.chatId),
-              }),
-              {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: isRetryable ? 503 : 502,
-              }
-            )
+            break
           }
 
-          deliveryResults.push({
+          successfulDeliveries.push({
             chatId,
             telegramMessageId: telegramResult?.result?.message_id ?? null,
           })
+          sent = true
           break
         } catch (telegramError: unknown) {
           const isAbortError =
@@ -279,35 +261,45 @@ serve(async (req) => {
             ? "Telegram request timed out"
             : (telegramError instanceof Error ? telegramError.message : "Telegram network request failed")
           lastError = fallbackError
+          lastRetryable = true
           console.error("Telegram network error", { chatId, attempt, error: fallbackError })
           if (attempt < TELEGRAM_MAX_ATTEMPTS) {
             await delay(getBackoffMs(attempt))
             continue
           }
-          return new Response(
-            JSON.stringify({
-              success: false,
-              error: fallbackError,
-              retryable: true,
-              failedChatId: chatId,
-              deliveredChatIds: deliveryResults.map((result) => result.chatId),
-            }),
-            {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 503,
-            }
-          )
+          break
         } finally {
           clearTimeout(timeoutId)
         }
       }
+
+      if (!sent) {
+        failedDeliveries.push({ chatId, error: lastError, retryable: lastRetryable })
+      }
+    }
+
+    if (failedDeliveries.length > 0) {
+      const hasRetryableFailure = failedDeliveries.some((failure) => failure.retryable)
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Failed to deliver message to one or more Telegram chats",
+          retryable: hasRetryableFailure,
+          deliveredChatIds: successfulDeliveries.map((result) => result.chatId),
+          failedDeliveries,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: hasRetryableFailure ? 503 : 502,
+        }
+      )
     }
 
     return new Response(
       JSON.stringify({
         success: true,
         message: "Message sent successfully",
-        telegramDeliveries: deliveryResults,
+        telegramDeliveries: successfulDeliveries,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
