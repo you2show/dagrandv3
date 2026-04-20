@@ -311,6 +311,67 @@ export const testTelegramConnection = async (): Promise<TelegramTestResult> => {
 };
 
 // ---------------------------------------------------------------------------
+// End-to-end test: sends a real test message through the full pipeline
+// ---------------------------------------------------------------------------
+export type TestMessageResult = {
+  ok: boolean;
+  steps: Array<{ label: string; ok: boolean; detail: string }>;
+};
+
+export const sendTestMessage = async (): Promise<TestMessageResult> => {
+  const steps: TestMessageResult['steps'] = [];
+
+  // Step 1 — health check
+  const healthResult = await testTelegramConnection();
+  steps.push(...healthResult.steps);
+
+  if (!healthResult.ok) {
+    steps.push({
+      label: 'Send test message',
+      ok: false,
+      detail: 'Skipped — health check failed. Fix the issues above first.',
+    });
+    return { ok: false, steps };
+  }
+
+  // Step 2 — actually send a test message through the full delivery pipeline
+  const timestamp = new Date().toLocaleString('en-US', {
+    timeZone: 'Asia/Phnom_Penh',
+    dateStyle: 'medium',
+    timeStyle: 'medium',
+  });
+
+  try {
+    const result = await sendTelegramMessage({
+      name: '🧪 Automated Test',
+      email: 'test@dagrand.com',
+      subject: 'Delivery Pipeline Test',
+      message: `This is an automated test message sent at ${timestamp} (Phnom Penh time) to verify the contact form → Telegram delivery pipeline is working correctly.\n\nIf you see this in your Telegram group, the pipeline is healthy. ✅`,
+    });
+
+    const deliveryCount = result.telegramDeliveries?.length ?? 0;
+    const chatIds = result.telegramDeliveries
+      ?.map((d) => d.chatId)
+      .join(', ') || 'N/A';
+
+    steps.push({
+      label: 'Send test message',
+      ok: true,
+      detail: `Delivered to ${deliveryCount} chat(s): ${chatIds}. Check your Telegram group!`,
+    });
+
+    return { ok: true, steps };
+  } catch (err) {
+    steps.push({
+      label: 'Send test message',
+      ok: false,
+      detail: err instanceof Error ? err.message : 'Unknown delivery error',
+    });
+    return { ok: false, steps };
+  }
+};
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 export const sendTelegramMessage = async (data: TelegramContactPayload): Promise<TelegramSendResult> => {
