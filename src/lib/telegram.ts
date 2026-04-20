@@ -148,6 +148,12 @@ const sendViaDirectFetch = async (payload: ReturnType<typeof buildPayload>): Pro
 // Strategy 3 — Direct Telegram Bot API call (last-resort fallback)
 // Only works when VITE_TELEGRAM_BOT_TOKEN and VITE_TELEGRAM_CHAT_ID are set
 // at build time. Sends the message straight to Telegram without any backend.
+//
+// ⚠️  SECURITY NOTE: Enabling this strategy exposes the bot token in the
+//    client JS bundle. Only set VITE_TELEGRAM_BOT_TOKEN / VITE_TELEGRAM_CHAT_ID
+//    if you accept this tradeoff (e.g. internal/private deployments, or the
+//    bot is scoped to a single group with minimal permissions). The strategy
+//    is disabled by default when these env vars are absent.
 // ---------------------------------------------------------------------------
 const sendViaDirectTelegramApi = async (
   payload: ReturnType<typeof buildPayload>,
@@ -156,8 +162,9 @@ const sendViaDirectTelegramApi = async (
     throw new Error('Direct Telegram API fallback is not configured.');
   }
 
+  const APP_NAME = 'dagrandv3';
   const text =
-    `📩 <b>New Contact Message (dagrandv3)</b>\n\n` +
+    `📩 <b>New Contact Message (${APP_NAME})</b>\n\n` +
     `👤 <b>Name:</b> ${escapeHtml(payload.name || 'N/A')}\n` +
     `📧 <b>Email:</b> ${escapeHtml(payload.email || 'N/A')}\n` +
     `📞 <b>Phone:</b> ${escapeHtml(payload.phone || 'N/A')}\n` +
