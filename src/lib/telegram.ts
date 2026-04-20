@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from './supabaseClient';
 
 export type TelegramContactPayload = {
   name?: string;
@@ -18,6 +18,20 @@ export type TelegramSendResult = {
 const normalize = (value?: string) => value?.trim() || '';
 
 // ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+const MAX_ATTEMPTS = 3;
+const BASE_BACKOFF_MS = 800;
+const REQUEST_TIMEOUT_MS = 15_000;
+
+// Build-time Telegram credentials for the direct-API fallback.
+// These are only populated when the corresponding VITE_ env vars are set.
+const VITE_TELEGRAM_BOT_TOKEN: string | undefined =
+  (import.meta as any).env?.VITE_TELEGRAM_BOT_TOKEN || undefined;
+const VITE_TELEGRAM_CHAT_ID: string | undefined =
+  (import.meta as any).env?.VITE_TELEGRAM_CHAT_ID || undefined;
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 const buildPayload = (data: TelegramContactPayload) => ({
@@ -29,6 +43,9 @@ const buildPayload = (data: TelegramContactPayload) => ({
   // Idempotency key: unique per submission, used for logging/tracing server-side.
   idempotencyKey: crypto.randomUUID(),
 });
+
+const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+const backoffMs = (attempt: number) => Math.min(attempt * BASE_BACKOFF_MS, 5_000);
 
 // Extract the most useful error message from a Supabase functions.invoke error.
 const extractEdgeFunctionError = async (
@@ -45,15 +62,18 @@ const extractEdgeFunctionError = async (
   return msg;
 };
 
+// Escape HTML entities for Telegram HTML parse mode.
+const escapeHtml = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
 // ---------------------------------------------------------------------------
-// Supabase Edge Function path (single production path)
-// All contact form submissions are routed through the Edge Function so that
-// the Telegram bot token is never exposed in the client bundle and retry /
-// logging / fallback logic lives in one place.
+// Strategy 1 — Supabase SDK invoke (primary)
+// Sends the payload via supabase.functions.invoke(). One attempt, no retry
+// (retries are handled by the outer orchestrator).
 // ---------------------------------------------------------------------------
-const sendViaEdgeFunction = async (payload: ReturnType<typeof buildPayload>): Promise<TelegramSendResult> => {
+const sendViaSdk = async (payload: ReturnType<typeof buildPayload>): Promise<TelegramSendResult> => {
   if (!supabase) {
-    throw new Error('Contact service is unavailable. Please check Supabase configuration.');
+    throw new Error('Supabase client is not initialized.');
   }
 
   const { data: result, error } = await supabase.functions.invoke('contact-form', {
@@ -69,10 +89,156 @@ const sendViaEdgeFunction = async (payload: ReturnType<typeof buildPayload>): Pr
   }
 
   if (!result?.success) {
-    throw new Error(result?.error || 'Failed to send message. Please try again.');
+    throw new Error(result?.error || 'Edge function returned an unsuccessful response.');
   }
 
   return result as TelegramSendResult;
+};
+
+// ---------------------------------------------------------------------------
+// Strategy 2 — Direct fetch to the Edge Function URL (bypasses SDK)
+// Useful when the Supabase JS SDK has version-specific issues or
+// mishandles headers / CORS internally.
+// ---------------------------------------------------------------------------
+const sendViaDirectFetch = async (payload: ReturnType<typeof buildPayload>): Promise<TelegramSendResult> => {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    throw new Error('Supabase URL or anon key is not configured.');
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const url = `${SUPABASE_URL}/functions/v1/contact-form`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'apikey': SUPABASE_ANON_KEY,
+        'x-request-id': payload.idempotencyKey,
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      let errorMsg = `Edge function responded with ${response.status}`;
+      try {
+        const body = await response.json();
+        if (typeof body?.error === 'string' && body.error.trim()) {
+          errorMsg = body.error.trim();
+        }
+      } catch { /* keep default */ }
+      throw new Error(errorMsg);
+    }
+
+    const result = await response.json();
+    if (!result?.success) {
+      throw new Error(result?.error || 'Edge function returned an unsuccessful response.');
+    }
+
+    return result as TelegramSendResult;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Strategy 3 — Direct Telegram Bot API call (last-resort fallback)
+// Only works when VITE_TELEGRAM_BOT_TOKEN and VITE_TELEGRAM_CHAT_ID are set
+// at build time. Sends the message straight to Telegram without any backend.
+// ---------------------------------------------------------------------------
+const sendViaDirectTelegramApi = async (
+  payload: ReturnType<typeof buildPayload>,
+): Promise<TelegramSendResult> => {
+  if (!VITE_TELEGRAM_BOT_TOKEN || !VITE_TELEGRAM_CHAT_ID) {
+    throw new Error('Direct Telegram API fallback is not configured.');
+  }
+
+  const text =
+    `📩 <b>New Contact Message (dagrandv3)</b>\n\n` +
+    `👤 <b>Name:</b> ${escapeHtml(payload.name || 'N/A')}\n` +
+    `📧 <b>Email:</b> ${escapeHtml(payload.email || 'N/A')}\n` +
+    `📞 <b>Phone:</b> ${escapeHtml(payload.phone || 'N/A')}\n` +
+    `📝 <b>Subject:</b> ${escapeHtml(payload.subject || 'N/A')}\n` +
+    `💬 <b>Message:</b>\n${escapeHtml(payload.message)}`;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(
+      `https://api.telegram.org/bot${VITE_TELEGRAM_BOT_TOKEN}/sendMessage`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: VITE_TELEGRAM_CHAT_ID,
+          text,
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+        }),
+        signal: controller.signal,
+      },
+    );
+
+    const result = await response.json();
+    if (!response.ok || result?.ok !== true) {
+      throw new Error(
+        result?.description || `Telegram API error (${response.status})`,
+      );
+    }
+
+    return {
+      success: true,
+      message: 'Message sent via direct Telegram API fallback',
+      telegramDeliveries: [{
+        chatId: VITE_TELEGRAM_CHAT_ID,
+        telegramMessageId: result?.result?.message_id ?? null,
+      }],
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Orchestrator — tries every strategy with retries
+// ---------------------------------------------------------------------------
+type Strategy = {
+  label: string;
+  fn: (payload: ReturnType<typeof buildPayload>) => Promise<TelegramSendResult>;
+  available: boolean;
+};
+
+const getStrategies = (): Strategy[] => [
+  { label: 'Supabase SDK', fn: sendViaSdk, available: !!supabase },
+  { label: 'Direct fetch', fn: sendViaDirectFetch, available: !!SUPABASE_URL && !!SUPABASE_ANON_KEY },
+  {
+    label: 'Direct Telegram API',
+    fn: sendViaDirectTelegramApi,
+    available: !!VITE_TELEGRAM_BOT_TOKEN && !!VITE_TELEGRAM_CHAT_ID,
+  },
+];
+
+const tryWithRetries = async (
+  strategyFn: (payload: ReturnType<typeof buildPayload>) => Promise<TelegramSendResult>,
+  payload: ReturnType<typeof buildPayload>,
+  attempts: number,
+): Promise<TelegramSendResult> => {
+  let lastError: Error | undefined;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return await strategyFn(payload);
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (i < attempts) {
+        await delay(backoffMs(i));
+      }
+    }
+  }
+  throw lastError!;
 };
 
 // ---------------------------------------------------------------------------
@@ -147,5 +313,27 @@ export const sendTelegramMessage = async (data: TelegramContactPayload): Promise
     throw new Error('Message is required.');
   }
 
-  return sendViaEdgeFunction(payload);
+  const strategies = getStrategies().filter((s) => s.available);
+  if (strategies.length === 0) {
+    throw new Error('No delivery method is available. Please check Supabase or Telegram configuration.');
+  }
+
+  const errors: string[] = [];
+
+  for (const strategy of strategies) {
+    try {
+      return await tryWithRetries(strategy.fn, payload, MAX_ATTEMPTS);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[telegram] Strategy "${strategy.label}" failed after ${MAX_ATTEMPTS} attempts: ${msg}`);
+      errors.push(`${strategy.label}: ${msg}`);
+    }
+  }
+
+  // Every strategy exhausted — throw a combined error.
+  throw new Error(
+    errors.length === 1
+      ? errors[0]
+      : `All delivery methods failed.\n${errors.map((e) => `• ${e}`).join('\n')}`,
+  );
 };
