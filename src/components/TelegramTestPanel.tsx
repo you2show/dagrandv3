@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { CheckCircle2, XCircle, Loader2, Send, RefreshCw } from 'lucide-react';
-import { testTelegramConnection, TelegramTestResult } from '../lib/telegram';
+import { CheckCircle2, XCircle, Loader2, Send, RefreshCw, MessageSquare } from 'lucide-react';
+import { testTelegramConnection, sendTestMessage, TelegramTestResult, TestMessageResult } from '../lib/telegram';
 
 type StepState = 'pending' | 'ok' | 'fail';
 
@@ -10,15 +10,42 @@ const stepIcon = (state: StepState) => {
   return <Loader2 className="h-4 w-4 text-gray-400 animate-spin shrink-0" />;
 };
 
+type CombinedResult = TelegramTestResult | TestMessageResult;
+
 export const TelegramTestPanel: React.FC = () => {
   const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<TelegramTestResult | null>(null);
+  const [result, setResult] = useState<CombinedResult | null>(null);
+  const [lastAction, setLastAction] = useState<'health' | 'send' | null>(null);
 
-  const run = async () => {
+  const runHealthCheck = async () => {
     setRunning(true);
     setResult(null);
+    setLastAction('health');
     try {
       const res = await testTelegramConnection();
+      setResult(res);
+    } catch (err) {
+      setResult({
+        ok: false,
+        steps: [
+          {
+            label: 'Unexpected error',
+            ok: false,
+            detail: err instanceof Error ? err.message : String(err),
+          },
+        ],
+      });
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const runSendTest = async () => {
+    setRunning(true);
+    setResult(null);
+    setLastAction('send');
+    try {
+      const res = await sendTestMessage();
       setResult(res);
     } catch (err) {
       setResult({
@@ -39,10 +66,10 @@ export const TelegramTestPanel: React.FC = () => {
   return (
     <div className="max-w-xl">
       <div className="mb-6">
-        <h3 className="text-lg font-serif font-bold text-brand-navy mb-1">Telegram Connection Test</h3>
+        <h3 className="text-lg font-serif font-bold text-brand-navy mb-1">Telegram Delivery Test</h3>
         <p className="text-sm text-gray-500">
-          Validates the Supabase Edge Function configuration: bot token, chat reachability,
-          and bot membership. Check your Telegram group after running.
+          Validate the full message delivery pipeline: Supabase Edge Function,
+          bot token, chat reachability, and end-to-end message delivery.
         </p>
       </div>
 
@@ -60,21 +87,35 @@ export const TelegramTestPanel: React.FC = () => {
         </p>
       </div>
 
-      {/* Run Button */}
-      <button
-        type="button"
-        onClick={run}
-        disabled={running}
-        className="inline-flex items-center gap-2 bg-brand-navy text-white px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-brand-gold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {running ? (
-          <><Loader2 className="h-4 w-4 animate-spin" /> Running…</>
-        ) : result ? (
-          <><RefreshCw className="h-4 w-4" /> Run Again</>
-        ) : (
-          <><Send className="h-4 w-4" /> Run Test</>
-        )}
-      </button>
+      {/* Action Buttons */}
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={runHealthCheck}
+          disabled={running}
+          className="inline-flex items-center gap-2 bg-brand-navy text-white px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-brand-gold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {running && lastAction === 'health' ? (
+            <><Loader2 className="h-4 w-4 animate-spin" /> Checking…</>
+          ) : result && lastAction === 'health' ? (
+            <><RefreshCw className="h-4 w-4" /> Health Check</>
+          ) : (
+            <><Send className="h-4 w-4" /> Health Check</>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={runSendTest}
+          disabled={running}
+          className="inline-flex items-center gap-2 bg-green-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {running && lastAction === 'send' ? (
+            <><Loader2 className="h-4 w-4 animate-spin" /> Sending…</>
+          ) : (
+            <><MessageSquare className="h-4 w-4" /> Send Test Message</>
+          )}
+        </button>
+      </div>
 
       {/* Results */}
       {result && (
@@ -88,9 +129,11 @@ export const TelegramTestPanel: React.FC = () => {
             }`}
           >
             {result.ok ? (
-              <><CheckCircle2 className="h-4 w-4" /> All checks passed — message delivered!</>
+              lastAction === 'send'
+                ? <><CheckCircle2 className="h-4 w-4" /> Test message delivered — check Telegram group!</>
+                : <><CheckCircle2 className="h-4 w-4" /> All checks passed</>
             ) : (
-              <><XCircle className="h-4 w-4" /> Test failed — see details below</>
+              <><XCircle className="h-4 w-4" /> {lastAction === 'send' ? 'Message delivery failed' : 'Test failed'} — see details below</>
             )}
           </div>
 

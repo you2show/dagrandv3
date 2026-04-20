@@ -464,7 +464,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Failed to deliver message to one or more Telegram chats',
+          error: 'Failed to deliver message to any Telegram chat',
           retryable: hasRetryableFailure,
           deliveredChatIds: [],
           failedDeliveries,
@@ -474,23 +474,14 @@ serve(async (req) => {
       )
     }
 
+    // At least one delivery succeeded — treat as success.
+    // Log any partial failures for monitoring but do not block the user.
     if (failedDeliveries.length > 0) {
-      const hasRetryableFailure = failedDeliveries.some((f) => f.retryable)
       console.warn('telegram_partial_success', { correlationId, successfulDeliveries, failedDeliveries })
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Failed to deliver message to one or more Telegram chats',
-          retryable: hasRetryableFailure,
-          deliveredChatIds: successfulDeliveries.map((r) => r.chatId),
-          failedDeliveries,
-          correlationId,
-        }),
-        { headers: responseHeaders, status: hasRetryableFailure ? 503 : 502 },
-      )
+    } else {
+      console.log('telegram_all_ok', { correlationId, successfulDeliveries })
     }
 
-    console.log('telegram_all_ok', { correlationId, successfulDeliveries })
     return new Response(
       JSON.stringify({
         success: true,
