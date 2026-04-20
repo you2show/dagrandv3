@@ -23,6 +23,9 @@ const normalize = (value?: string) => value?.trim() || '';
 const MAX_ATTEMPTS = 3;
 const BASE_BACKOFF_MS = 800;
 const REQUEST_TIMEOUT_MS = 15_000;
+const APP_NAME = 'Dagrand Law Office';
+const TIMEZONE = 'Asia/Phnom_Penh';
+const TEST_EMAIL = 'test@dagrand.com';
 
 // Build-time Telegram credentials for the direct-API fallback.
 // These are only populated when the corresponding VITE_ env vars are set.
@@ -162,7 +165,6 @@ const sendViaDirectTelegramApi = async (
     throw new Error('Direct Telegram API fallback is not configured.');
   }
 
-  const APP_NAME = 'dagrandv3';
   const text =
     `📩 <b>New Contact Message (${APP_NAME})</b>\n\n` +
     `👤 <b>Name:</b> ${escapeHtml(payload.name || 'N/A')}\n` +
@@ -336,7 +338,7 @@ export const sendTestMessage = async (): Promise<TestMessageResult> => {
 
   // Step 2 — actually send a test message through the full delivery pipeline
   const timestamp = new Date().toLocaleString('en-US', {
-    timeZone: 'Asia/Phnom_Penh',
+    timeZone: TIMEZONE,
     dateStyle: 'medium',
     timeStyle: 'medium',
   });
@@ -344,9 +346,9 @@ export const sendTestMessage = async (): Promise<TestMessageResult> => {
   try {
     const result = await sendTelegramMessage({
       name: '🧪 Automated Test',
-      email: 'test@dagrand.com',
+      email: TEST_EMAIL,
       subject: 'Delivery Pipeline Test',
-      message: `This is an automated test message sent at ${timestamp} (Phnom Penh time) to verify the contact form → Telegram delivery pipeline is working correctly.\n\nIf you see this in your Telegram group, the pipeline is healthy. ✅`,
+      message: `This is an automated test message sent at ${timestamp} to verify the contact form → Telegram delivery pipeline is working correctly.\n\nIf you see this in your Telegram group, the pipeline is healthy. ✅`,
     });
 
     const deliveryCount = result.telegramDeliveries?.length ?? 0;
