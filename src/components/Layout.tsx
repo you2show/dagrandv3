@@ -118,6 +118,16 @@ const LanguageSwitcher = () => {
         EN
       </button>
       <button
+        onClick={() => setLanguage('km')}
+        className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all duration-300 ${
+          language === 'km' 
+            ? 'bg-brand-gold text-white shadow-sm' 
+            : 'text-gray-400 hover:text-white'
+        }`}
+      >
+        ខ្មែរ
+      </button>
+      <button
         onClick={() => setLanguage('cn')}
         className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all duration-300 ${
           language === 'cn' 
