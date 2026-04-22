@@ -26,13 +26,12 @@ const REQUEST_TIMEOUT_MS = 15_000;
 const APP_NAME = 'Dagrand Law Office';
 const TIMEZONE = 'Asia/Phnom_Penh';
 const TEST_EMAIL = 'test@dagrand.com';
+const CONTACT_FORM_TARGET_CHAT_ID = '905513579';
 
 // Build-time Telegram credentials for the direct-API fallback.
 // These are only populated when the corresponding VITE_ env vars are set.
 const VITE_TELEGRAM_BOT_TOKEN: string | undefined =
   (import.meta as any).env?.VITE_TELEGRAM_BOT_TOKEN || undefined;
-const VITE_TELEGRAM_CHAT_ID: string | undefined =
-  (import.meta as any).env?.VITE_TELEGRAM_CHAT_ID || undefined;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -149,11 +148,11 @@ const sendViaDirectFetch = async (payload: ReturnType<typeof buildPayload>): Pro
 
 // ---------------------------------------------------------------------------
 // Strategy 3 — Direct Telegram Bot API call (last-resort fallback)
-// Only works when VITE_TELEGRAM_BOT_TOKEN and VITE_TELEGRAM_CHAT_ID are set
+// Only works when VITE_TELEGRAM_BOT_TOKEN is set.
 // at build time. Sends the message straight to Telegram without any backend.
 //
 // ⚠️  SECURITY NOTE: Enabling this strategy exposes the bot token in the
-//    client JS bundle. Only set VITE_TELEGRAM_BOT_TOKEN / VITE_TELEGRAM_CHAT_ID
+//    client JS bundle. Only set VITE_TELEGRAM_BOT_TOKEN
 //    if you accept this tradeoff (e.g. internal/private deployments, or the
 //    bot is scoped to a single group with minimal permissions). The strategy
 //    is disabled by default when these env vars are absent.
@@ -161,7 +160,7 @@ const sendViaDirectFetch = async (payload: ReturnType<typeof buildPayload>): Pro
 const sendViaDirectTelegramApi = async (
   payload: ReturnType<typeof buildPayload>,
 ): Promise<TelegramSendResult> => {
-  if (!VITE_TELEGRAM_BOT_TOKEN || !VITE_TELEGRAM_CHAT_ID) {
+  if (!VITE_TELEGRAM_BOT_TOKEN) {
     throw new Error('Direct Telegram API fallback is not configured.');
   }
 
@@ -183,7 +182,7 @@ const sendViaDirectTelegramApi = async (
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          chat_id: VITE_TELEGRAM_CHAT_ID,
+          chat_id: CONTACT_FORM_TARGET_CHAT_ID,
           text,
           parse_mode: 'HTML',
           disable_web_page_preview: true,
@@ -203,7 +202,7 @@ const sendViaDirectTelegramApi = async (
       success: true,
       message: 'Message sent via direct Telegram API fallback',
       telegramDeliveries: [{
-        chatId: VITE_TELEGRAM_CHAT_ID,
+        chatId: CONTACT_FORM_TARGET_CHAT_ID,
         telegramMessageId: result?.result?.message_id ?? null,
       }],
     };
@@ -227,7 +226,7 @@ const getStrategies = (): Strategy[] => [
   {
     label: 'Direct Telegram API',
     fn: sendViaDirectTelegramApi,
-    available: !!VITE_TELEGRAM_BOT_TOKEN && !!VITE_TELEGRAM_CHAT_ID,
+    available: !!VITE_TELEGRAM_BOT_TOKEN,
   },
 ];
 

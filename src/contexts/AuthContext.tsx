@@ -11,6 +11,13 @@ export interface User {
   password?: string; // Only used in Mock mode
 }
 
+// Emails that are always treated as admin in Supabase mode even before
+// user_metadata.role is explicitly set on the Supabase user record.
+const ADMIN_EMAILS = new Set([
+  'mathyousos5@gmail.com',
+  'soky@dagrand.net',
+]);
+
 // Hardcoded Demo Users to ensure reliability
 const DEMO_USERS: User[] = [
     {
@@ -136,7 +143,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
             if (session) {
                const { user: sbUser } = session;
-               const isAdminEmail = sbUser.email === 'mathyousos5@gmail.com';
+               const isAdminEmail = ADMIN_EMAILS.has((sbUser.email ?? '').toLowerCase());
                setUser({
                  id: sbUser.id,
                  email: sbUser.email || '',
@@ -155,7 +162,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const { data } = supabase.auth.onAuthStateChange((_event, session) => {
                 if (session) {
                     const { user: sbUser } = session;
-                    const isAdminEmail = sbUser.email === 'mathyousos5@gmail.com';
+                    const isAdminEmail = ADMIN_EMAILS.has((sbUser.email ?? '').toLowerCase());
                     setUser({
                         id: sbUser.id,
                         email: sbUser.email || '',
