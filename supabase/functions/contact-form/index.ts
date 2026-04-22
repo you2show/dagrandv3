@@ -252,7 +252,7 @@ async function handleHealthCheck(corsHeaders: Record<string, string>): Promise<R
   const label = `Chat ID reachable (${chatId})`
   const ctrl2 = new AbortController()
   const tid2 = setTimeout(() => ctrl2.abort(), TELEGRAM_TIMEOUT_MS)
-  let allChatsOk = true
+  let targetChatReachable = false
   try {
     const res = await fetch(
       `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getChat?chat_id=${encodeURIComponent(chatId)}`,
@@ -270,7 +270,7 @@ async function handleHealthCheck(corsHeaders: Record<string, string>): Promise<R
         ? `${type}: ${title}`
         : `Telegram error: ${json?.description ?? res.status}. Ensure the bot is added to the chat.`,
     })
-    if (!chatOk) allChatsOk = false
+    targetChatReachable = chatOk
   } catch (err) {
     clearTimeout(tid2)
     const isTimeout = err instanceof Error && err.name === 'AbortError'
@@ -279,10 +279,10 @@ async function handleHealthCheck(corsHeaders: Record<string, string>): Promise<R
       ok: false,
       detail: isTimeout ? 'Request timed out' : 'Network error reaching Telegram API',
     })
-    allChatsOk = false
+    targetChatReachable = false
   }
 
-  const ok = getMeOk && allChatsOk
+  const ok = getMeOk && targetChatReachable
   return new Response(
     JSON.stringify({ ok, steps }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
