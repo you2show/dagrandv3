@@ -375,7 +375,7 @@ serve(async (req) => {
     }
 
     const TELEGRAM_BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN')
-    const TELEGRAM_CHAT_IDS = [CONTACT_FORM_TARGET_CHAT_ID]
+    const TELEGRAM_CHAT_ID = CONTACT_FORM_TARGET_CHAT_ID
 
     if (!TELEGRAM_BOT_TOKEN) {
       console.error('telegram_not_configured', { correlationId })
@@ -396,13 +396,16 @@ serve(async (req) => {
     const successfulDeliveries: DeliverySuccess[] = []
     const failedDeliveries: DeliveryFailure[] = []
 
-    for (const chatId of TELEGRAM_CHAT_IDS) {
-      const { sent, result, failure } = await sendToChat(TELEGRAM_BOT_TOKEN, chatId, text, correlationId)
-      if (sent && result) {
-        successfulDeliveries.push(result)
-      } else if (failure) {
-        failedDeliveries.push(failure)
-      }
+    const { sent, result, failure } = await sendToChat(
+      TELEGRAM_BOT_TOKEN,
+      TELEGRAM_CHAT_ID,
+      text,
+      correlationId,
+    )
+    if (sent && result) {
+      successfulDeliveries.push(result)
+    } else if (failure) {
+      failedDeliveries.push(failure)
     }
 
     if (successfulDeliveries.length === 0) {
