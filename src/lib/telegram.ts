@@ -32,7 +32,7 @@ const CONTACT_FORM_TARGET_CHAT_ID = '905513579';
 // These are only populated when the corresponding VITE_ env vars are set.
 const VITE_TELEGRAM_BOT_TOKEN: string | undefined =
   (import.meta as any).env?.VITE_TELEGRAM_BOT_TOKEN || undefined;
-const VITE_TELEGRAM_CHAT_ID: string = CONTACT_FORM_TARGET_CHAT_ID;
+const TARGET_TELEGRAM_CHAT_ID: string = CONTACT_FORM_TARGET_CHAT_ID;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -183,7 +183,7 @@ const sendViaDirectTelegramApi = async (
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          chat_id: VITE_TELEGRAM_CHAT_ID,
+          chat_id: TARGET_TELEGRAM_CHAT_ID,
           text,
           parse_mode: 'HTML',
           disable_web_page_preview: true,
@@ -203,7 +203,7 @@ const sendViaDirectTelegramApi = async (
       success: true,
       message: 'Message sent via direct Telegram API fallback',
       telegramDeliveries: [{
-        chatId: VITE_TELEGRAM_CHAT_ID,
+        chatId: TARGET_TELEGRAM_CHAT_ID,
         telegramMessageId: result?.result?.message_id ?? null,
       }],
     };
