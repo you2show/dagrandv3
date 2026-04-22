@@ -53,15 +53,36 @@ const backoffMs = (attempt: number) => Math.min(attempt * BASE_BACKOFF_MS, 5_000
 const extractEdgeFunctionError = async (
   error: { message?: string; context?: unknown },
 ): Promise<string> => {
-  let msg = error.message || 'Failed to send message.';
   const context = error.context as Response | undefined;
+  const statusPrefix = context ? `${context.status}: ` : '';
+
   if (context) {
+    // Try to read a structured error from the response body.
+    let rawText: string | undefined;
     try {
-      const ctx = await context.clone().json();
-      if (typeof ctx?.error === 'string' && ctx.error.trim()) msg = ctx.error.trim();
-    } catch { /* keep fallback */ }
+      rawText = await context.clone().text();
+      const ctx = JSON.parse(rawText);
+      if (typeof ctx?.error === 'string' && ctx.error.trim()) {
+        return `${statusPrefix}${ctx.error.trim()}`;
+      }
+      if (typeof ctx?.message === 'string' && ctx.message.trim()) {
+        return `${statusPrefix}${ctx.message.trim()}`;
+      }
+    } catch { /* fall through */ }
+
+    // If JSON parsing failed but we got raw text, show that (truncated).
+    if (rawText && rawText.trim()) {
+      const truncated = rawText.trim().slice(0, 200);
+      return `${statusPrefix}${truncated}`;
+    }
+
+    // Last resort: just prefix the status code.
+    if (statusPrefix) {
+      return `${statusPrefix}${error.message || 'Failed to send message.'}`;
+    }
   }
-  return msg;
+
+  return error.message || 'Failed to send message.';
 };
 
 // Escape HTML entities for Telegram HTML parse mode.
