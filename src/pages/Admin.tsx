@@ -544,9 +544,12 @@ const Admin = () => {
                   });
                   if (data?.error) throw new Error(data.error);
                   updatedByAdminAction = true;
-              } catch {
+              } catch (adminUpdateErr: any) {
+                  console.warn("Admin email update path failed, falling back to self update:", adminUpdateErr?.message || adminUpdateErr);
                   const { error: selfUpdateError } = await supabase.auth.updateUser({ email: cleanEmail });
-                  if (selfUpdateError) throw new Error(`Failed to request email update: ${selfUpdateError.message}`);
+                  if (selfUpdateError) {
+                      throw new Error(`Both admin and self-update email methods failed: ${selfUpdateError.message}`);
+                  }
               }
 
               if (updatedByAdminAction) {
