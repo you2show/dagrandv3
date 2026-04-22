@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useAuth, User } from '../contexts/AuthContext';
-import { Scale, Lock, ArrowRight, LogOut, Users, FileText, Plus, Check, X, Trash2, CloudOff, Database, Loader2, ChevronDown, Edit, Image as ImageIcon, Calendar, Save, Menu, Eye, EyeOff, Globe, Upload, UserCog, Camera, Bold, Italic, Underline, List, ListOrdered, Undo, Redo, User as UserIcon, Mail, Heading1, Heading2, Quote, AlignLeft, AlignCenter, Info, UserPlus, Key, Send } from 'lucide-react';
+import { Scale, Lock, ArrowRight, LogOut, Users, FileText, Plus, Check, X, Trash2, CloudOff, Database, Loader2, ChevronDown, Edit, Image as ImageIcon, Calendar, Save, Menu, Eye, EyeOff, Globe, Upload, UserCog, Camera, Bold, Italic, Underline, List, ListOrdered, Undo, Redo, User as UserIcon, Mail, Heading1, Heading2, Quote, AlignLeft, AlignCenter, Info, UserPlus, Key } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -10,7 +10,7 @@ import { LegalUpdate } from '../../types';
 import { supabase, SUPABASE_URL } from '../lib/supabaseClient';
 import { z } from 'zod';
 import DOMPurify from 'dompurify';
-import { TelegramTestPanel } from '../components/TelegramTestPanel';
+
 
 const MotionDiv = motion.div as any;
 
@@ -143,7 +143,7 @@ const RichTextEditor = ({ value, onChange, placeholder }: { value: string, onCha
 
 const Admin = () => {
   const { isAuthenticated, login, logout, user, users: contextUsers, addUser, changePassword, isLoading: authLoading, isMockMode } = useAuth();
-  const [activeTab, setActiveTab] = useState<'content' | 'team' | 'settings'>('content');
+  const [activeTab, setActiveTab] = useState<'content' | 'team'>('content');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   const [email, setEmail] = useState('');
@@ -1035,13 +1035,6 @@ const Admin = () => {
                         </span>
                     </div>
                 </button>
-                <button onClick={() => { setActiveTab('settings'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-lg transition-all duration-200 group ${activeTab === 'settings' ? 'bg-brand-gold text-white shadow-lg' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
-                    <Send className={`h-5 w-5 ${activeTab === 'settings' ? 'text-white' : 'text-gray-500 group-hover:text-white'}`} />
-                    <div className="text-left">
-                        <span className="block text-sm font-bold">Telegram Test</span>
-                        <span className="block text-[10px] opacity-70 font-normal">Debug connection</span>
-                    </div>
-                </button>
                 
                 <div className="pt-4 mt-2 border-t border-white/10">
                     <Link to="/" className="w-full flex items-center gap-4 px-4 py-3.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-all duration-200 group">
@@ -1276,12 +1269,14 @@ const Admin = () => {
                                                                     <div className="font-bold text-gray-900 text-sm">{member.name}</div>
                                                                     {(isCurrentUser || isAdmin) && (
                                                                         <div className="flex gap-2">
-                                                                            <button onClick={() => startEditUser(member)} className="opacity-0 group-hover/edit:opacity-100 text-gray-400 hover:text-brand-navy transition-opacity">
+                                                                            <button onClick={() => startEditUser(member)} className="flex items-center gap-1 text-gray-400 hover:text-brand-navy transition-colors">
                                                                                 <UserCog className="h-3 w-3" />
+                                                                                <span className="hidden lg:inline text-xs">Rename</span>
                                                                             </button>
                                                                             {isCurrentUser && (
-                                                                                <button onClick={() => setIsPasswordModalOpen(true)} className="opacity-0 group-hover/edit:opacity-100 text-gray-400 hover:text-brand-navy transition-opacity">
+                                                                                <button onClick={() => setIsPasswordModalOpen(true)} className="flex items-center gap-1 text-gray-400 hover:text-brand-navy transition-colors">
                                                                                     <Key className="h-3 w-3" />
+                                                                                    <span className="hidden lg:inline text-xs">Password</span>
                                                                                 </button>
                                                                             )}
                                                                         </div>
@@ -1340,24 +1335,6 @@ const Admin = () => {
                 </div>
             )}
 
-            {activeTab === 'settings' && (
-                <div className="absolute inset-0 overflow-y-auto">
-                    <div className="h-20 bg-white border-b border-gray-200 flex items-center px-4 lg:px-8 shadow-sm sticky top-0 z-30">
-                        <div className="flex items-center gap-4">
-                            <button onClick={() => setIsSidebarOpen(true)} className="lg:hidden text-gray-500 hover:text-brand-navy">
-                                <Menu className="h-6 w-6" />
-                            </button>
-                            <div>
-                                <h2 className="text-xl lg:text-2xl font-serif font-bold text-brand-navy">Telegram Test</h2>
-                                <p className="text-xs text-gray-500">Verify bot configuration and delivery</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="p-6 lg:p-10">
-                        <TelegramTestPanel />
-                    </div>
-                </div>
-            )}
         </main>
         
         <AnimatePresence>
