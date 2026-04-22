@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
 import { SEO } from '../components/SEO';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, Lock, Eye, FileText, Globe, MapPin, Mail, ArrowRight, AlertCircle, CheckCircle2, List, X, ArrowLeft } from 'lucide-react';
+import { Shield, Lock, Eye, FileText, MapPin, Mail, ArrowRight, AlertCircle, CheckCircle2, List, X, ArrowLeft } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 const MotionDiv = motion.div as any;
@@ -150,8 +150,12 @@ const PrivacyPolicy = () => {
             >
               {/* Introduction */}
               <div id="intro" className="prose prose-lg dark:prose-invert max-w-none text-gray-600 dark:text-gray-300 font-light leading-loose">
-                <p className="lead text-xl text-brand-navy dark:text-white font-serif font-medium mb-8">
-                  This Privacy Policy applies to Personal Information collected by Dagrand Law Office through <span className="text-brand-gold font-bold">www.dagrand.net</span> and our digital services.
+                <p className="lead text-xl text-brand-navy dark:text-white font-serif font-medium mb-6">
+                  This Privacy Policy applies to Personal Information (as defined below) collected by Dagrand Law Office ("Dagrand Law Office," "we," "us," or "our") through <span className="text-brand-gold font-bold">https://www.dagrand.net/</span> and any other website, application, or digital service on or to which this Privacy Policy is linked or referenced (collectively, the "Services").
+                </p>
+
+                <p className="text-sm mb-8">
+                  We are committed to protecting your privacy and complying with the laws in force in the Kingdom of Cambodia, specifically the Law on Electronic Commerce (2019) and the Law on Consumer Protection.
                 </p>
                 
                 <div className="bg-brand-navy/5 dark:bg-black/20 p-6 rounded-lg border-l-4 border-brand-navy dark:border-brand-gold mb-8">
@@ -164,12 +168,12 @@ const PrivacyPolicy = () => {
                 </div>
 
                 <p className="text-sm">
-                  <span className="font-bold text-brand-navy dark:text-white">Accessibility:</span> If you require support or an alternative format to review this Privacy Policy, please contact us through Section 9 below.
+                  <span className="font-bold text-brand-navy dark:text-white">Accessibility:</span> If you require support or an alternative format to review this Privacy Policy, please contact us through any of the methods listed in Section 9 below ("Contact Us").
                 </p>
 
                 <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/10 text-red-800 dark:text-red-200 text-xs font-bold uppercase tracking-wide rounded-md border border-red-100 dark:border-red-900/20 my-8">
                   <AlertCircle className="h-4 w-4 shrink-0" />
-                  If you do not agree with any part of this policy, please do not use our services.
+                  If you do not agree with any part of this privacy policy or our terms of use, please do not use our services and do not provide us with your personal information.
                 </div>
               </div>
 
@@ -192,20 +196,24 @@ const PrivacyPolicy = () => {
                   <span className="w-8 h-8 rounded-full bg-brand-gray dark:bg-white/10 flex items-center justify-center text-sm font-sans text-brand-gold">02</span>
                   Personal Information We May Collect
                 </h2>
+                <p className="text-gray-600 dark:text-gray-300 mb-2">
+                  "Personal Information" means any information that identifies, relates to, describes, or is reasonably capable of being associated with an individual.
+                </p>
                 <p className="text-gray-600 dark:text-gray-300 mb-6">
-                  "Personal Information" means any information that identifies, relates to, describes, or is reasonably capable of being associated with an individual. We may collect:
+                  We may collect the following categories of Personal Information:
                 </p>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {[
-                    { label: "Direct Identifiers", desc: "Name, address, email, phone numbers." },
-                    { label: "Personal Records", desc: "Signatures, financial & payment info." },
-                    { label: "Protected Characteristics", desc: "Age, marital status, gender." },
-                    { label: "Commercial Info", desc: "Services purchased, KYC checks." },
-                    { label: "Internet Activity", desc: "IP address, browsing history, device info." },
-                    { label: "Geolocation Data", desc: "Physical location via IP or office visits." },
-                    { label: "Professional Info", desc: "Job title, organization details." },
-                    { label: "Sensitive Info", desc: "Gov IDs (Passport/ID Cards), case details." },
+                    { label: "Direct Identifiers", desc: "Name, postal address, email address, phone numbers, and unique personal identifiers." },
+                    { label: "Personal Records", desc: "Signatures, financial account information, and payment information (e.g., if you make payments to us directly)." },
+                    { label: "Protected Characteristics", desc: "Age, date of birth, marital status, gender." },
+                    { label: "Commercial Information", desc: "Records of services purchased, background information provided for client onboarding, regulatory compliance checks (KYC), and information generated during the course of providing legal services." },
+                    { label: "Internet or Network Activity", desc: "Records of your interaction with our website, IP address, operating system, browser type, and device information." },
+                    { label: "Geolocation Data", desc: "Physical location derived from your IP address or information collected should you visit the Dagrand Law Office premises." },
+                    { label: "Professional or Employment Information", desc: "Job title, organization, and other professional details." },
+                    { label: "Sensitive Personal Information", desc: "Government-issued IDs (passports, National ID cards), and where necessary for legal representation, specific case-related details." },
+                    { label: "Documents", desc: "Any documents that you may send to us." },
                   ].map((item, idx) => (
                     <div key={idx} className="p-4 rounded-lg bg-gray-50 dark:bg-black/20 border border-gray-100 dark:border-white/5">
                       <h4 className="font-bold text-brand-navy dark:text-white text-sm mb-1">{item.label}</h4>
@@ -228,7 +236,12 @@ const PrivacyPolicy = () => {
                       <FileText className="h-4 w-4 text-brand-gold" /> How We Collect
                     </h3>
                     <ul className="list-none space-y-2 pl-1">
-                      {['Directly from you (registration, forms, consultation)', 'Through Social Media interactions', 'From Third Parties (government registries)', 'Automated Technologies (cookies)'].map((text, i) => (
+                      {[
+                        'Directly From You: When you register, fill out a contact form, subscribe to newsletters, or provide information during legal consultation or services.',
+                        'Through Social Media: If you interact with our services through social media platforms (e.g., Facebook, LinkedIn, Telegram), we may receive information from those platforms subject to your privacy settings.',
+                        'From Third Parties: We may collect information from third parties where required to fulfill legal obligations (e.g., government registries) or strictly for the provision of requested services.',
+                        'Automated Technologies: As you navigate our website, we may use automatic data collection technologies to collect certain information about your equipment and browsing actions.',
+                      ].map((text, i) => (
                         <li key={i} className="flex items-start gap-3 text-gray-600 dark:text-gray-300 text-sm">
                           <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
                           <span>{text}</span>
@@ -241,18 +254,43 @@ const PrivacyPolicy = () => {
                     <h3 className="text-lg font-bold text-brand-navy dark:text-white mb-3 flex items-center gap-2">
                       <Shield className="h-4 w-4 text-brand-gold" /> How We Use
                     </h3>
-                    <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed mb-4">
-                      We use your information for lawful business purposes including service delivery, communication, internal operations improvements, and legal compliance (including AML checks).
+                    <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed mb-3">
+                      We use your information for lawful business purposes, including:
                     </p>
+                    <ul className="list-none space-y-2 pl-1">
+                      {[
+                        'Service Delivery: To provide legal services, process payments, and verify your identity.',
+                        'Communication: To respond to inquiries, send legal updates, and notify you of changes to our policies.',
+                        'Internal Operations: To improve our website, analyze usage trends, and maintain the security of our services.',
+                        'Legal Compliance: To comply with applicable Cambodian laws, court orders, or regulations, requirements from the governmental agencies or competent authorities, including Anti-Money Laundering (AML) checks.',
+                      ].map((text, i) => (
+                        <li key={i} className="flex items-start gap-3 text-gray-600 dark:text-gray-300 text-sm">
+                          <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                          <span>{text}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
 
                   <div>
                     <h3 className="text-lg font-bold text-brand-navy dark:text-white mb-3 flex items-center gap-2">
                       <Eye className="h-4 w-4 text-brand-gold" /> How We Disclose
                     </h3>
-                    <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
-                      We do not sell your Personal Information. We may disclose it to Service Providers (IT, accountants), Legal Authorities (courts, government agents), or during Business Transfers.
+                    <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed mb-3">
+                      We do not sell your Personal Information. We may disclose your information to:
                     </p>
+                    <ul className="list-none space-y-2 pl-1">
+                      {[
+                        'Service Providers: Our employees, third-party legal professionals or agents with whom we cooperate for providing the required services to you, third-party vendors who support our operations (e.g., IT support, cloud hosting, accountants, etc).',
+                        'Legal Authorities: Courts, tribunals, regulatory bodies, government agents, and law enforcement officers as required by law or to protect our rights and safety.',
+                        'Business Transfers: In the event of a merger, restructuring, or transfer of assets.',
+                      ].map((text, i) => (
+                        <li key={i} className="flex items-start gap-3 text-gray-600 dark:text-gray-300 text-sm">
+                          <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                          <span>{text}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 </div>
               </section>
@@ -263,9 +301,20 @@ const PrivacyPolicy = () => {
                   <span className="w-8 h-8 rounded-full bg-brand-gray dark:bg-white/10 flex items-center justify-center text-sm font-sans text-brand-gold">04</span>
                   Cookies & Technology
                 </h2>
-                <p className="text-gray-600 dark:text-gray-300 leading-loose text-sm">
-                  We use cookies and similar tracking technologies (like Google Analytics) to track the activity on our services and hold certain information. Cookies are files with a small amount of data stored on your device.
+                <p className="text-gray-600 dark:text-gray-300 leading-loose text-sm mb-4">
+                  We may use cookies and similar tracking technologies to track the activity on our services and hold certain information.
                 </p>
+                <ul className="list-none space-y-2 pl-1">
+                  {[
+                    'Cookies: Cookies are files with a small amount of data which may include an anonymous unique identifier. Cookies are sent to your browser from a website and stored on your device.',
+                    'Analytics: We may use third-party service providers (such as Google Analytics) to monitor and analyze the use of our service.',
+                  ].map((text, i) => (
+                    <li key={i} className="flex items-start gap-3 text-gray-600 dark:text-gray-300 text-sm">
+                      <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                      <span>{text}</span>
+                    </li>
+                  ))}
+                </ul>
               </section>
 
               {/* SECTION 5 */}
@@ -274,20 +323,26 @@ const PrivacyPolicy = () => {
                   <span className="w-8 h-8 rounded-full bg-brand-gray dark:bg-white/10 flex items-center justify-center text-sm font-sans text-brand-gold">05</span>
                   Your Rights and Choices
                 </h2>
+                <p className="text-gray-600 dark:text-gray-300 text-sm mb-4">
+                  Depending on your interactions with us, you may have the following choices regarding your data:
+                </p>
                 <ul className="space-y-4">
                   <li className="bg-gray-50 dark:bg-white/5 p-4 rounded-lg">
                     <span className="font-bold text-brand-navy dark:text-white block mb-1">Opt-Out of Marketing</span>
-                    <span className="text-sm text-gray-600 dark:text-gray-300">Unsubscribe from newsletters via the link in emails.</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-300">You may unsubscribe from our email newsletters by following the "unsubscribe" link in the email or contacting us directly.</span>
                   </li>
                   <li className="bg-gray-50 dark:bg-white/5 p-4 rounded-lg">
                     <span className="font-bold text-brand-navy dark:text-white block mb-1">Access and Correction</span>
-                    <span className="text-sm text-gray-600 dark:text-gray-300">Request access to your data or corrections to inaccurate info.</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-300">You may request access to the Personal Information we hold about you or request corrections to inaccurate data or deletion of your Personal Information.</span>
                   </li>
                   <li className="bg-gray-50 dark:bg-white/5 p-4 rounded-lg">
                     <span className="font-bold text-brand-navy dark:text-white block mb-1">Location Data</span>
-                    <span className="text-sm text-gray-600 dark:text-gray-300">Disable location services on your mobile device.</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-300">You may disable location services on your mobile device to prevent the collection of geolocation data.</span>
                   </li>
                 </ul>
+                <p className="text-gray-600 dark:text-gray-300 text-sm mt-4">
+                  To exercise these rights, please contact us using the details in Section 9.
+                </p>
               </section>
 
               {/* SECTION 6 */}
@@ -297,7 +352,7 @@ const PrivacyPolicy = () => {
                   Third-Party Links
                 </h2>
                 <p className="text-gray-600 dark:text-gray-300 leading-loose">
-                  Our Services may contain links to third-party websites (LinkedIn, Facebook, etc). We are not responsible for their privacy practices.
+                  Our Services may contain links to third-party websites (e.g., LinkedIn, Facebook, Telegram, WeChat etc). We are not responsible for the privacy practices or content of these third-party websites. We encourage you to read the privacy policies of any website you visit.
                 </p>
               </section>
 
@@ -308,7 +363,7 @@ const PrivacyPolicy = () => {
                   International Visitors
                 </h2>
                 <p className="text-gray-600 dark:text-gray-300 leading-loose">
-                  Services are operated from Cambodia. Information may be processed in Cambodia. By using services, you consent to this transfer.
+                  The services are controlled and operated from the Kingdom of Cambodia. If you access the services from outside Cambodia, your information may be transferred to, stored, and processed in Cambodia or countries where our servers are located. By using the services, you consent to this transfer. We will take reasonable steps to ensure your data is treated securely and in accordance with this policy.
                 </p>
               </section>
 
@@ -321,7 +376,7 @@ const PrivacyPolicy = () => {
                 <div className="flex items-start gap-4 p-6 bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/20 rounded-lg">
                   <Shield className="h-6 w-6 text-green-600 dark:text-green-400 shrink-0 mt-1" />
                   <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">
-                    We implement appropriate technical and organizational measures to protect your Personal Information. However, no transmission over the Internet is 100% secure.
+                    We implement appropriate technical and organizational measures to protect your Personal Information from unauthorized access, use, or disclosure. However, no method of transmission over the Internet is 100% secured, and we cannot guarantee absolute security.
                   </p>
                 </div>
               </section>
@@ -333,6 +388,10 @@ const PrivacyPolicy = () => {
                   Questions or Comments
                 </h2>
                 
+                <p className="text-gray-600 dark:text-gray-300 text-sm mb-6">
+                  If you have any questions about this Privacy Policy or our data practices, please contact us at:
+                </p>
+
                 <div className="bg-brand-navy text-white p-8 rounded-xl shadow-xl relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-40 h-40 bg-brand-gold opacity-10 rounded-full blur-3xl translate-x-1/3 -translate-y-1/3"></div>
                   
@@ -350,12 +409,6 @@ const PrivacyPolicy = () => {
                       <Mail className="h-5 w-5 text-brand-gold shrink-0" />
                       <a href="mailto:info@dagrand.net" className="text-sm text-white hover:text-brand-gold transition-colors font-bold tracking-wide">
                         info@dagrand.net
-                      </a>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <Globe className="h-5 w-5 text-brand-gold shrink-0" />
-                      <a href="https://www.dagrand.net" className="text-sm text-white hover:text-brand-gold transition-colors">
-                        www.dagrand.net
                       </a>
                     </div>
                   </div>
