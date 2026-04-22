@@ -517,6 +517,13 @@ const Admin = () => {
           toast.error("Invalid email address");
           return;
       }
+      const duplicateMember = teamMembers.find(
+          m => m.id !== memberId && m.email.trim().toLowerCase() === cleanEmail
+      );
+      if (duplicateMember) {
+          toast.error("This email is already used by another team member");
+          return;
+      }
 
       setEditingEmailId(null);
 
@@ -527,6 +534,32 @@ const Admin = () => {
       }
 
       try {
+          const isSelf = memberId === user?.id;
+          if (isSelf) {
+              let updatedByAdminAction = false;
+              try {
+                  const data = await invokeAdminAction('updateUser', {
+                      userId: memberId,
+                      attributes: { email: cleanEmail, email_confirm: true }
+                  });
+                  if (data?.error) throw new Error(data.error);
+                  updatedByAdminAction = true;
+              } catch {
+                  const { error: selfUpdateError } = await supabase.auth.updateUser({ email: cleanEmail });
+                  if (selfUpdateError) throw selfUpdateError;
+              }
+
+              setTeamMembers(prev => prev.map(m => m.id === memberId ? { ...m, email: cleanEmail } : m));
+              if (updatedByAdminAction) {
+                  toast.success("Email Updated");
+              } else {
+                  toast.success("Email update requested", {
+                      description: "Please confirm from your email inbox to complete this change."
+                  });
+              }
+              return;
+          }
+
           const data = await invokeAdminAction('updateUser', {
               userId: memberId,
               attributes: { email: cleanEmail, email_confirm: true }
