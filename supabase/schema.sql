@@ -65,9 +65,16 @@ WITH CHECK ( bucket_id = 'avatars' AND auth.role() = 'authenticated' );
 CREATE POLICY "Avatar Owner Update" ON storage.objects FOR UPDATE
 USING ( bucket_id = 'avatars' AND auth.uid() = owner );
 
--- 2. Blog Images Policies
-CREATE POLICY "Blog Public Read" ON storage.objects FOR SELECT
-USING ( bucket_id = 'blog-images' );
+-- =========================================================
+-- 3. GRANT ADMIN ROLE TO SPECIFIC USERS
+-- =========================================================
+-- Run this once after the target user has signed up.
+-- It stamps role='admin' into their Supabase user_metadata so the RLS
+-- policies above and the client-side AuthContext both treat them as admin.
+--
+-- ⚠️  The user must already exist in auth.users (i.e. they must have
+--    signed up / been invited first).
+UPDATE auth.users
+  SET raw_user_meta_data = raw_user_meta_data || '{"role": "admin"}'::jsonb
+  WHERE email = 'soky@dagrand.net';
 
-CREATE POLICY "Blog Auth Upload" ON storage.objects FOR INSERT
-WITH CHECK ( bucket_id = 'blog-images' AND auth.role() = 'authenticated' );
