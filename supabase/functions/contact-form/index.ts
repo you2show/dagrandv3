@@ -1,22 +1,116 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
-const normalizeOrigin = (origin: string) => {
+const normalizeOrigin = (
+  origin: string,
+  options: { warnOnInvalid?: boolean; label?: string } = {},
+) => {
   const normalized = origin.trim()
   if (!normalized) return null
   try {
     return new URL(normalized).origin.toLowerCase()
   } catch {
-    console.warn(`Ignoring invalid CORS origin: ${origin}`)
+    if (options.warnOnInvalid ?? true) {
+      const label = options.label ?? 'origin'
+      console.warn(`Ignoring invalid ${label}: ${origin}`)
+    }
     return null
   }
 }
 
-const allowedOrigins = (Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '')
-  .split(',')
-  .map((entry) => normalizeOrigin(entry))
-  .filter((origin): origin is string => Boolean(origin))
+type OriginRule = {
+  raw: string
+  matches: (originUrl: URL) => boolean
+}
 
-if (allowedOrigins.length === 0) {
+const normalizeHostPattern = (host: string) => host.trim().toLowerCase().replace(/\.$/, '')
+
+const matchHostWithOptionalPort = (
+  originUrl: URL,
+  host: string,
+  port: string | null,
+  allowSubdomains: boolean,
+) => {
+  const normalizedHost = normalizeHostPattern(host)
+  if (!normalizedHost) return false
+  const originHost = originUrl.hostname.toLowerCase()
+  const hostMatched = allowSubdomains
+    ? originHost === normalizedHost || originHost.endsWith(`.${normalizedHost}`)
+    : originHost === normalizedHost
+  if (!hostMatched) return false
+  return port ? originUrl.port === port : true
+}
+
+const parseOriginRule = (entry: string): OriginRule | null => {
+  const raw = entry.trim()
+  if (!raw) return null
+  const value = raw.toLowerCase()
+
+  if (value === '*') {
+    return { raw, matches: () => true }
+  }
+
+  const wildcardWithSchemeMatch = value.match(/^(https?):\/\/\*\.([^/:]+)(?::(\d+))?$/)
+  if (wildcardWithSchemeMatch) {
+    const protocol = `${wildcardWithSchemeMatch[1]}:`
+    const host = wildcardWithSchemeMatch[2]
+    const port = wildcardWithSchemeMatch[3] ?? null
+    return {
+      raw,
+      matches: (originUrl) =>
+        originUrl.protocol === protocol &&
+        matchHostWithOptionalPort(originUrl, host, port, true),
+    }
+  }
+
+  const wildcardHostMatch = value.match(/^\*\.([^/:]+)(?::(\d+))?$/)
+  if (wildcardHostMatch) {
+    const host = wildcardHostMatch[1]
+    const port = wildcardHostMatch[2] ?? null
+    return {
+      raw,
+      matches: (originUrl) => matchHostWithOptionalPort(originUrl, host, port, true),
+    }
+  }
+
+  const suffixHostMatch = value.match(/^\.(.+)$/)
+  if (suffixHostMatch) {
+    const host = suffixHostMatch[1]
+    return {
+      raw,
+      matches: (originUrl) => matchHostWithOptionalPort(originUrl, host, null, true),
+    }
+  }
+
+  const exactOrigin = normalizeOrigin(value, { warnOnInvalid: false })
+  if (exactOrigin) {
+    return { raw, matches: (originUrl) => originUrl.origin.toLowerCase() === exactOrigin }
+  }
+
+  // Support host-only entries, e.g. "dagrand.net", "www.dagrand.net", or "localhost:5173"
+  try {
+    const hostUrl = new URL(`https://${value}`)
+    const hasPath = hostUrl.pathname && hostUrl.pathname !== '/'
+    if (hasPath || hostUrl.search || hostUrl.hash) {
+      console.warn(`Ignoring invalid CORS origin pattern (unexpected path/query/hash): ${raw}`)
+      return null
+    }
+    const port = hostUrl.port || null
+    return {
+      raw,
+      matches: (originUrl) => matchHostWithOptionalPort(originUrl, hostUrl.hostname, port, false),
+    }
+  } catch {
+    console.warn(`Ignoring invalid CORS origin pattern: ${raw}`)
+    return null
+  }
+}
+
+const allowedOriginRules = (Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '')
+  .split(',')
+  .map((entry) => parseOriginRule(entry))
+  .filter((rule): rule is OriginRule => Boolean(rule))
+
+if (allowedOriginRules.length === 0) {
   console.warn('CORS_ALLOWED_ORIGINS is empty; contact-form will use wildcard CORS.')
 }
 
@@ -294,16 +388,27 @@ async function handleHealthCheck(corsHeaders: Record<string, string>): Promise<R
 // ---------------------------------------------------------------------------
 serve(async (req) => {
   const origin = req.headers.get('origin')
-  const normalizedOrigin = origin ? normalizeOrigin(origin) : null
-  const allowOriginHeader =
-    normalizedOrigin ?? (allowedOrigins.length === 0 ? '*' : null)
+  const normalizedOrigin = origin
+    ? normalizeOrigin(origin, { warnOnInvalid: true, label: 'request origin' })
+    : null
+  const originUrl = normalizedOrigin ? new URL(normalizedOrigin) : null
+  const hasOriginRules = allowedOriginRules.length > 0
+  const originMatched = originUrl
+    ? allowedOriginRules.some((rule) => rule.matches(originUrl))
+    : false
   // Requests without an Origin header are non-browser calls (e.g. Supabase
   // Dashboard test tool, curl, server-to-server). CORS is a browser security
   // mechanism and does not apply to these — always allow them through.
   const isOriginAllowed =
     normalizedOrigin === null ||
-    allowedOrigins.length === 0 ||
-    allowedOrigins.includes(normalizedOrigin)
+    !hasOriginRules ||
+    originMatched
+  let allowOriginHeader: string | null = null
+  if (normalizedOrigin) {
+    allowOriginHeader = isOriginAllowed ? normalizedOrigin : null
+  } else if (!hasOriginRules) {
+    allowOriginHeader = '*'
+  }
   const corsHeaders: Record<string, string> = {
     'Vary': 'Origin',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-request-id, x-idempotency-key',
