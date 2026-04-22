@@ -143,8 +143,14 @@ const TermsOfService = () => {
             >
               {/* Introduction Text */}
               <div className="prose prose-lg dark:prose-invert max-w-none mb-12">
-                 <p className="lead text-xl text-brand-navy dark:text-white font-serif font-medium">
+                 <p className="lead text-xl text-brand-navy dark:text-white font-serif font-medium mb-4">
                     The website accessible via the URL <span className="text-brand-gold font-bold">https://www.dagrand.net</span> (hereinafter the "Website") contains legal and practical information relating to Dagrand Law Office.
+                 </p>
+                 <p className="text-sm text-gray-600 dark:text-gray-300 leading-loose">
+                    The Website is edited and operated by Dagrand Law Office, a professional law office registered with the Bar Association of the Kingdom of Cambodia (BAKC).
+                 </p>
+                 <p className="text-sm text-gray-600 dark:text-gray-300 leading-loose">
+                    By using the Website, you consent to these Terms of Service, which incorporate other terms and conditions and legal notices that appear on this Website.
                  </p>
               </div>
 
@@ -201,8 +207,11 @@ const TermsOfService = () => {
                         <p className="text-gray-600 dark:text-gray-300 text-sm leading-loose mb-3">
                             Some Content displayed on the Website may be quoted, reproduced, embedded, or downloaded from third‑party sources. Such Content remain the intellectual property of their respective owners. Dagrand Law Office does not claim proprietary rights in Content that is clearly identified as originating from third parties or that is used under license or license-free, fair use, consent, or other lawful exceptions.
                         </p>
-                        <p className="text-gray-600 dark:text-gray-300 text-sm leading-loose">
+                        <p className="text-gray-600 dark:text-gray-300 text-sm leading-loose mb-3">
                             Unless a specific license or permission is expressly provided on the Website, users must obtain permission from the original rights holder before copying, redistributing, republishing, or otherwise using third‑party Content for any purpose beyond viewing on the Website.
+                        </p>
+                        <p className="text-gray-600 dark:text-gray-300 text-sm leading-loose">
+                            To the fullest extent permitted by Cambodian laws, Dagrand Law Office disclaims any liability for the accuracy, completeness, or legality of third‑party Content and for any consequences of relying on such Content.
                         </p>
                     </div>
 
@@ -216,11 +225,14 @@ const TermsOfService = () => {
                             </p>
                             <div className="bg-red-50 dark:bg-red-900/10 p-4 border-l-4 border-red-400 dark:border-red-500 rounded-r">
                                 <p className="text-xs text-gray-700 dark:text-gray-300 m-0">
-                                    <strong>Restrictions:</strong> Except as provided above, the user may not: copy, reproduce, represent, publicly display, broadcast, perform, transmit, distribute, publish, permanently or temporarily, all or part of the Content and/or Website in any manner and in any media now known or hereafter developed; create derivative works; modify, translate, adapt, arrange all or part of the Content; or disassemble, decompile or reverse engineer the Website.
+                                    <strong>Restrictions:</strong> Except as provided above, the user may not: copy, reproduce, represent, publicly display, broadcast, perform, transmit, distribute, publish, permanently or temporarily, all or part of the Content and/or Website in any manner and in any media now known or hereafter developed; create derivative works of the Content and/or Website; modify, translate, adapt, arrange all or part of the Content and/or Website; or disassemble, decompile or reverse engineer the Website. In any event, users are solely responsible for their use of the documents, information, and personal data provided via the Website.
                                 </p>
                             </div>
                             <p>
                                 Users agree to use these documents, information, and personal data for personal purposes only and shall not distribute or disclose them to any third party or re-use them, in whole or in part, without making reference to or obtaining prior consent from Dagrand Law Office.
+                            </p>
+                            <p>
+                                In addition, data relating to Dagrand Law Office members (including photographs and professional data) that are made available via the Website should not be collected and processed without the prior written approval of the person concerned. In particular, each user agrees not to collect or use such data, through manual or automated means, in order to send unsolicited marketing or other messages or make unsolicited marketing telephone calls or other calls.
                             </p>
                         </div>
                     </div>
@@ -240,7 +252,7 @@ const TermsOfService = () => {
                             <Shield className="h-4 w-4" /> Permitted Use
                         </h4>
                         <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
-                            Users agree to use the services available via the Website and all information and documents accessible via the Website for personal purposes only and in compliance with laws, public order, morality, and third-party rights.
+                            Users agree to use the services available via the Website and all information and documents accessible via the Website for personal purposes only and in compliance with laws, public order, morality, and third-party rights. Users must not use the Website to infringe the rights of others; transmit unlawful, harmful or offensive material; interfere with the operation of the Website; or attempt to gain unauthorized access to any portion of the Website.
                         </p>
                     </div>
                     
@@ -249,17 +261,20 @@ const TermsOfService = () => {
                             <Ban className="h-4 w-4" /> Prohibited Use
                         </h4>
                         <ul className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed list-disc list-inside space-y-1">
-                            <li>Upload or transmit viruses or malware.</li>
-                            <li>Harvest personal data without consent.</li>
+                            <li>Upload or transmit viruses, malware, or other harmful code.</li>
+                            <li>Harvest or collect personal data of other users without consent.</li>
                             <li>Impersonate any person or entity.</li>
-                            <li>Use automated means (bots, scrapers).</li>
-                            <li>Engage in conduct that disrupts the Website.</li>
+                            <li>Use automated means (bots, scrapers) to access or extract data without our prior written permission.</li>
+                            <li>Engage in conduct that disrupts or degrades the Website.</li>
                         </ul>
                     </div>
                 </div>
-                <p className="mt-4 text-xs text-gray-500 italic">
-                    We may suspend or terminate your access to the Website at any time for breach of these Terms of Service.
-                </p>
+                <div className="mt-6 pl-4 border-l-2 border-brand-gold/30">
+                    <strong className="block text-brand-navy dark:text-white mb-1 text-sm">Suspension and Termination</strong>
+                    <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
+                        We may suspend or terminate your access to the Website at any time for breach of these Terms of Service, suspected fraudulent or illegal activity, or for security reasons. Termination does not limit our other rights or remedies.
+                    </p>
+                </div>
               </section>
 
               {/* SECTION 5 */}
@@ -271,29 +286,49 @@ const TermsOfService = () => {
                 
                 <div className="space-y-6 text-gray-600 dark:text-gray-300 text-sm leading-loose">
                     <div className="pl-4 border-l-2 border-brand-gold/30">
-                        <strong className="block text-brand-navy dark:text-white mb-1">No Warranty on Uninterrupted Use</strong>
-                        Dagrand Law Office will use its best efforts to ensure Website availability 24/7. However, we make no warranty that the Website will be uninterrupted and/or error-free. We may temporarily suspend access for maintenance without incurring liability.
+                        <strong className="block text-brand-navy dark:text-white mb-1">No Warranty on Uninterrupted Use of the Website</strong>
+                        Dagrand Law Office will use its best efforts to ensure Website availability and accessibility 24 hours a day, 7 days a week. However, Dagrand Law Office makes no warranty that the Website will be uninterrupted and/or error-free. Dagrand Law Office may temporarily suspend access to the Website, including for technical maintenance purposes, without incurring any liability whatsoever.
+                        <p className="mt-3">
+                            Please also note that the Internet network and IT and telecommunication systems are not error-free, and interruptions and failures may occur. Dagrand Law Office makes no warranty in this respect and cannot be held liable for any damage resulting from the use of the Website, the Internet network, and the IT and telecommunication systems. Dagrand Law Office, its officers, or employees cannot be held liable for any damage whatsoever resulting from any login to the Website by the user under his/her sole liability.
+                        </p>
                     </div>
 
                     <div className="pl-4 border-l-2 border-brand-gold/30">
                         <strong className="block text-brand-navy dark:text-white mb-1">Third Party Links and Content</strong>
-                        The Website may contain links to websites managed by third parties. These are independent, and we have no control over their sources or content. Links are provided solely as a convenience, and users are fully responsible for visiting such Third-Party Websites.
+                        The Website may contain links to websites that are managed by third parties (hereafter the "Third-Party Websites"). These Third-Party Websites are independent of the Website and Dagrand Law Office has no control over the sources or content of such Third-Party Websites or their links with other websites. The links to Third-Party Websites are not intended in any way as an approval, endorsement, or acceptance by Dagrand Law Office of Third-Party Websites' content nor an association between Dagrand Law Office and the owners and/or authors, designers, moderators, operators, or hosts of these websites. These links are provided solely as a convenience to users and users are fully responsible for visiting such Third-Party Websites.
                     </div>
 
                     <div className="pl-4 border-l-2 border-brand-gold/30">
                         <strong className="block text-brand-navy dark:text-white mb-1">No Legal Advice</strong>
-                        The Content on the Website is for educational and informational purposes only. It does not constitute legal advice, create an attorney–client relationship, or substitute for consultation with a qualified lawyer.
+                        The Content on the Website is provided for educational and informational purposes only. The Content on the Website do not constitute legal advice, create an attorney–client relationship, or substitute for consultation with a qualified lawyer. While we strive to ensure accuracy and currency of the information, laws and regulations may change, and interpretations may vary. Readers should not act or refrain from acting based on the Content without seeking professional legal counsel appropriate to their specific circumstances.
+                        <p className="mt-3">
+                            Dagrand Law Office disclaims any warranty and liability related to the merchantability, fitness for a particular purpose, non‑infringement, accuracy, completeness, precision, and comprehensiveness of the Content made available and displayed on the Website. Dagrand Law Office cannot be held liable to anyone with regard to the information and documents made available on the Website, as these information and documents are provided for educational and informational purposes only.
+                        </p>
                     </div>
 
                     <div className="bg-gray-100 dark:bg-white/5 p-5 rounded-lg text-xs">
-                        <strong className="block text-brand-navy dark:text-white mb-2 uppercase tracking-wide">Liability Disclaimer</strong>
-                        To the fullest extent permitted by Cambodian laws, Dagrand Law Office shall not be liable for any direct, indirect, incidental, special, consequential, punitive, or exemplary damages arising out of:
+                        <strong className="block text-brand-navy dark:text-white mb-2 uppercase tracking-wide">Limitation of Liability</strong>
+                        Furthermore, to the fullest extent permitted by Cambodian laws, Dagrand Law Office and its officers, partners, employees, agents, (collectively, "we", "us", or "our") shall not be liable for any direct, indirect, incidental, special, consequential, punitive, or exemplary damages, or any loss of profits, revenue, data, goodwill, business interruption, or other intangible losses, arising out of or in connection with:
                         <ul className="list-disc list-inside mt-2 space-y-1">
-                            <li>Your access to or use of the Website or any Content;</li>
-                            <li>Viruses, malware, or other harmful code transmitted to your device;</li>
-                            <li>Errors, omissions, inaccuracies, or delays in the Content;</li>
-                            <li>Any unauthorized access to or alteration of your transmissions or data.</li>
+                            <li>your access to or use of, or inability to access or use, the Website or any Content;</li>
+                            <li>any viruses, malware, ransomware, trojans, worms, or other harmful code that may be transmitted to or through your device as a result of using the Website;</li>
+                            <li>any errors, omissions, inaccuracies, or delays in the Content;</li>
+                            <li>any third‑party content, links, or services accessed through the Website; or</li>
+                            <li>any unauthorized access to or alteration of your transmissions or data.</li>
                         </ul>
+                    </div>
+
+                    <div className="pl-4 border-l-2 border-brand-gold/30">
+                        <strong className="block text-brand-navy dark:text-white mb-1">User Responsibilities</strong>
+                        Information and documents contained on the Website may be modified at any time without prior notice. Users acknowledge that they are solely responsible for their use of the information and documents made available to them via the Website.
+                        <p className="mt-3">
+                            Users shall be responsible for maintaining appropriate security and backup procedures, including up‑to‑date antivirus and anti‑malware software, and for taking reasonable steps to protect their devices and data.
+                        </p>
+                    </div>
+
+                    <div className="pl-4 border-l-2 border-brand-gold/30">
+                        <strong className="block text-brand-navy dark:text-white mb-1">Indemnity</strong>
+                        You agree to indemnify, defend, and hold harmless Dagrand Law Office and its officers, partners, employees, agents, contractors, and licensors from and against any claims, liabilities, losses, damages, costs, and expenses (including reasonable legal fees) arising from: (a) your breach of these Terms of Service; (b) your misuse of the Website; (c) your violation of applicable law or third‑party rights; or (d) User Content that you submit to us.
                     </div>
                 </div>
               </section>
@@ -318,7 +353,7 @@ const TermsOfService = () => {
                 <div className="bg-brand-navy/5 dark:bg-white/5 p-6 rounded-lg border border-brand-navy/10 dark:border-white/10">
                     <Scale className="h-6 w-6 text-brand-navy dark:text-white mb-4" />
                     <p className="text-gray-700 dark:text-gray-300 text-sm leading-loose">
-                      This Website and these Terms of Service are governed by and construed in accordance with the laws of the Kingdom of Cambodia. By using this Website, users agree that any matters and disputes arising under and in connection with this Website and these Terms of Service shall be submitted to arbitration administered by the National Commercial Arbitration Centre of the Kingdom of Cambodia (NCAC). The seat of Arbitration shall be in Phnom Penh, Cambodia. The language of arbitration shall be Khmer. The award of the arbitral tribunal shall be final and binding.
+                      This Website and these Terms of Service are governed by and construed in accordance with the laws of the Kingdom of Cambodia. By using this Website, users agree that any matters and disputes arising under and in connection with this Website and these Terms of Service shall be submitted to arbitration administered by the National Commercial Arbitration Centre of the Kingdom of Cambodia in accordance with the Arbitration Rules of the National Commercial Arbitration Centre (NCAC Arbitration Rules) being in force at the time of commencement of arbitration. The seat of Arbitration shall be in Phnom Penh, Cambodia. The arbitral tribunal shall consist of one arbitrator. The language of arbitration shall be Khmer. The award of the arbitral tribunal shall be final and binding.
                     </p>
                 </div>
               </section>
@@ -329,6 +364,10 @@ const TermsOfService = () => {
                   <span className="w-8 h-8 rounded-full bg-brand-gray dark:bg-white/10 flex items-center justify-center text-sm font-sans text-brand-gold">08</span>
                   Questions or Comments
                 </h2>
+
+                <p className="text-gray-600 dark:text-gray-300 text-sm mb-6">
+                  If you have any questions about this Website or these Terms of Service, please contact us at:
+                </p>
                 
                 <div className="bg-brand-navy text-white p-8 rounded-xl shadow-xl relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-40 h-40 bg-brand-gold opacity-10 rounded-full blur-3xl translate-x-1/3 -translate-y-1/3"></div>
@@ -347,12 +386,6 @@ const TermsOfService = () => {
                       <Mail className="h-5 w-5 text-brand-gold shrink-0" />
                       <a href="mailto:info@dagrand.net" className="text-sm text-white hover:text-brand-gold transition-colors font-bold tracking-wide">
                         info@dagrand.net
-                      </a>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <Globe className="h-5 w-5 text-brand-gold shrink-0" />
-                      <a href="https://www.dagrand.net" className="text-sm text-white hover:text-brand-gold transition-colors">
-                        www.dagrand.net
                       </a>
                     </div>
                   </div>

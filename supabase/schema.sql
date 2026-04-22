@@ -55,6 +55,11 @@ ON CONFLICT (id) DO NOTHING;
 
 -- STORAGE POLICIES (Allow public read, authenticated upload)
 
+-- Clean up existing storage policies to avoid conflicts
+DROP POLICY IF EXISTS "Avatar Public Read" ON storage.objects;
+DROP POLICY IF EXISTS "Avatar Auth Upload" ON storage.objects;
+DROP POLICY IF EXISTS "Avatar Owner Update" ON storage.objects;
+
 -- 1. Avatars Policies
 CREATE POLICY "Avatar Public Read" ON storage.objects FOR SELECT
 USING ( bucket_id = 'avatars' );
