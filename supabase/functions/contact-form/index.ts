@@ -24,9 +24,8 @@ const TELEGRAM_TIMEOUT_MS = 8000
 const TELEGRAM_MAX_ATTEMPTS = 3
 const TELEGRAM_BASE_BACKOFF_MS = 500
 const TELEGRAM_RETRYABLE_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504])
-// Default fallback requested by project owner; can be overridden with
-// TELEGRAM_CHAT_IDS / TELEGRAM_CHAT_ID environment variables.
-const DEFAULT_TELEGRAM_GROUP_CHAT_ID = '-1003986946717'
+// Contact form submissions must be delivered only to this Telegram user ID.
+const CONTACT_FORM_TARGET_CHAT_ID = '905513579'
 
 const normalizeField = (value: unknown, fallback = 'N/A', maxLength = 1000) => {
   const normalized = typeof value === 'string' ? value.trim() : ''
@@ -248,21 +247,10 @@ async function handleHealthCheck(corsHeaders: Record<string, string>): Promise<R
     )
   }
 
-  // Check each configured chat ID
-  const TELEGRAM_CHAT_IDS_RAW =
-    Deno.env.get('TELEGRAM_CHAT_IDS') ??
-    Deno.env.get('TELEGRAM_CHAT_ID') ??
-    DEFAULT_TELEGRAM_GROUP_CHAT_ID
-  const primaryChatIds = TELEGRAM_CHAT_IDS_RAW
-    .split(',')
-    .map((id) => id.trim())
-    .filter((id) => id.length > 0)
-
-  const FALLBACK_CHAT_ID = Deno.env.get('TELEGRAM_FALLBACK_CHAT_ID')?.trim() || null
+  // Check only the fixed, owner-approved recipient chat ID.
+  const primaryChatIds = [CONTACT_FORM_TARGET_CHAT_ID]
+  const FALLBACK_CHAT_ID: string | null = null
   const allChatIds = [...primaryChatIds]
-  if (FALLBACK_CHAT_ID && !allChatIds.includes(FALLBACK_CHAT_ID)) {
-    allChatIds.push(FALLBACK_CHAT_ID)
-  }
 
   let allChatsOk = true
   for (const chatId of allChatIds) {
@@ -393,15 +381,8 @@ serve(async (req) => {
     }
 
     const TELEGRAM_BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN')
-    const TELEGRAM_CHAT_IDS_RAW =
-      Deno.env.get('TELEGRAM_CHAT_IDS') ??
-      Deno.env.get('TELEGRAM_CHAT_ID') ??
-      DEFAULT_TELEGRAM_GROUP_CHAT_ID
-    const TELEGRAM_CHAT_IDS = TELEGRAM_CHAT_IDS_RAW
-      .split(',')
-      .map((chatId) => chatId.trim())
-      .filter((chatId) => chatId.length > 0)
-    const TELEGRAM_FALLBACK_CHAT_ID = Deno.env.get('TELEGRAM_FALLBACK_CHAT_ID')?.trim() || null
+    const TELEGRAM_CHAT_IDS = [CONTACT_FORM_TARGET_CHAT_ID]
+    const TELEGRAM_FALLBACK_CHAT_ID: string | null = null
 
     if (!TELEGRAM_BOT_TOKEN) {
       console.error('telegram_not_configured', { correlationId })
