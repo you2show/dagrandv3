@@ -185,6 +185,10 @@ const Admin = () => {
   const [newUserName, setNewUserName] = useState('');
   const [avatarUploadingId, setAvatarUploadingId] = useState<string | null>(null);
 
+  // Edit User Email State
+  const [editingEmailId, setEditingEmailId] = useState<string | null>(null);
+  const [newEmail, setNewEmail] = useState('');
+
   // Single HTML string for the editor state
   const [editorContent, setEditorContent] = useState('');
 
@@ -499,6 +503,41 @@ const Admin = () => {
       if (user?.id !== member.id && !isAdmin) return; 
       setEditingUserId(member.id);
       setNewUserName(member.name);
+  };
+
+  const startEditEmail = (member: User) => {
+      if (!isAdmin) return;
+      setEditingEmailId(member.id);
+      setNewEmail(member.email);
+  };
+
+  const saveUserEmail = async (memberId: string) => {
+      const cleanEmail = newEmail.trim().toLowerCase();
+      if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+          toast.error("Invalid email address");
+          return;
+      }
+
+      setEditingEmailId(null);
+
+      if (isMockMode || !supabase) {
+          setTeamMembers(prev => prev.map(m => m.id === memberId ? { ...m, email: cleanEmail } : m));
+          toast.success("Email Updated (Mock)");
+          return;
+      }
+
+      try {
+          const data = await invokeAdminAction('updateUser', {
+              userId: memberId,
+              attributes: { email: cleanEmail, email_confirm: true }
+          });
+          if (data?.error) throw new Error(data.error);
+          setTeamMembers(prev => prev.map(m => m.id === memberId ? { ...m, email: cleanEmail } : m));
+          toast.success("Email Updated");
+      } catch (err: any) {
+          toast.error("Failed to update email", { description: err.message });
+          setEditingEmailId(memberId);
+      }
   };
 
   const saveUserName = async (memberId: string) => {
@@ -1283,7 +1322,32 @@ const Admin = () => {
                                                                     )}
                                                                 </div>
                                                             )}
-                                                            <div className="text-xs text-gray-500">{member.email}</div>
+                                                            {editingEmailId === member.id ? (
+                                                                <div className="flex items-center gap-2 mt-1">
+                                                                    <input
+                                                                        autoFocus
+                                                                        type="email"
+                                                                        value={newEmail}
+                                                                        onChange={(e) => setNewEmail(e.target.value)}
+                                                                        className="border border-brand-gold rounded px-2 py-0.5 text-xs outline-none w-44"
+                                                                        onKeyDown={(e) => {
+                                                                            if (e.key === 'Enter') saveUserEmail(member.id);
+                                                                            if (e.key === 'Escape') setEditingEmailId(null);
+                                                                        }}
+                                                                    />
+                                                                    <button onClick={() => saveUserEmail(member.id)} className="p-1 hover:bg-green-100 rounded text-green-600"><Check className="h-3 w-3" /></button>
+                                                                    <button onClick={() => setEditingEmailId(null)} className="p-1 hover:bg-red-100 rounded text-red-500"><X className="h-3 w-3" /></button>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex items-center gap-1.5 mt-0.5">
+                                                                    <span className="text-xs text-gray-500">{member.email}</span>
+                                                                    {isAdmin && (
+                                                                        <button onClick={() => startEditEmail(member)} className="text-gray-300 hover:text-brand-navy transition-colors" title="Change email">
+                                                                            <Mail className="h-3 w-3" />
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </td>
