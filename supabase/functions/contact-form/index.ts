@@ -248,44 +248,38 @@ async function handleHealthCheck(corsHeaders: Record<string, string>): Promise<R
   }
 
   // Check only the fixed, owner-approved recipient chat ID.
-  const primaryChatIds = [CONTACT_FORM_TARGET_CHAT_ID]
-  const FALLBACK_CHAT_ID: string | null = null
-  const allChatIds = [...primaryChatIds]
-
+  const chatId = CONTACT_FORM_TARGET_CHAT_ID
+  const label = `Chat ID reachable (${chatId})`
+  const ctrl2 = new AbortController()
+  const tid2 = setTimeout(() => ctrl2.abort(), TELEGRAM_TIMEOUT_MS)
   let allChatsOk = true
-  for (const chatId of allChatIds) {
-    const isFallback = FALLBACK_CHAT_ID === chatId && !primaryChatIds.includes(chatId)
-    const label = `Chat ID reachable (${chatId}${isFallback ? ' [fallback]' : ''})`
-    const ctrl2 = new AbortController()
-    const tid2 = setTimeout(() => ctrl2.abort(), TELEGRAM_TIMEOUT_MS)
-    try {
-      const res = await fetch(
-        `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getChat?chat_id=${encodeURIComponent(chatId)}`,
-        { signal: ctrl2.signal },
-      )
-      clearTimeout(tid2)
-      const json = await res.json()
-      const chatOk = res.ok && json?.ok === true
-      const title = json?.result?.title ?? json?.result?.username ?? '?'
-      const type = json?.result?.type ?? '?'
-      steps.push({
-        label,
-        ok: chatOk,
-        detail: chatOk
-          ? `${type}: ${title}`
-          : `Telegram error: ${json?.description ?? res.status}. Ensure the bot is added to the chat.`,
-      })
-      if (!chatOk) allChatsOk = false
-    } catch (err) {
-      clearTimeout(tid2)
-      const isTimeout = err instanceof Error && err.name === 'AbortError'
-      steps.push({
-        label,
-        ok: false,
-        detail: isTimeout ? 'Request timed out' : 'Network error reaching Telegram API',
-      })
-      allChatsOk = false
-    }
+  try {
+    const res = await fetch(
+      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getChat?chat_id=${encodeURIComponent(chatId)}`,
+      { signal: ctrl2.signal },
+    )
+    clearTimeout(tid2)
+    const json = await res.json()
+    const chatOk = res.ok && json?.ok === true
+    const title = json?.result?.title ?? json?.result?.username ?? '?'
+    const type = json?.result?.type ?? '?'
+    steps.push({
+      label,
+      ok: chatOk,
+      detail: chatOk
+        ? `${type}: ${title}`
+        : `Telegram error: ${json?.description ?? res.status}. Ensure the bot is added to the chat.`,
+    })
+    if (!chatOk) allChatsOk = false
+  } catch (err) {
+    clearTimeout(tid2)
+    const isTimeout = err instanceof Error && err.name === 'AbortError'
+    steps.push({
+      label,
+      ok: false,
+      detail: isTimeout ? 'Request timed out' : 'Network error reaching Telegram API',
+    })
+    allChatsOk = false
   }
 
   const ok = getMeOk && allChatsOk
@@ -382,20 +376,11 @@ serve(async (req) => {
 
     const TELEGRAM_BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN')
     const TELEGRAM_CHAT_IDS = [CONTACT_FORM_TARGET_CHAT_ID]
-    const TELEGRAM_FALLBACK_CHAT_ID: string | null = null
 
     if (!TELEGRAM_BOT_TOKEN) {
       console.error('telegram_not_configured', { correlationId })
       return new Response(
         JSON.stringify({ success: false, error: 'TELEGRAM_BOT_TOKEN is not configured', correlationId }),
-        { headers: responseHeaders, status: 500 },
-      )
-    }
-
-    if (TELEGRAM_CHAT_IDS.length === 0) {
-      console.error('telegram_no_chats', { correlationId })
-      return new Response(
-        JSON.stringify({ success: false, error: 'TELEGRAM_CHAT_ID or TELEGRAM_CHAT_IDS is not configured', correlationId }),
         { headers: responseHeaders, status: 500 },
       )
     }
@@ -417,25 +402,6 @@ serve(async (req) => {
         successfulDeliveries.push(result)
       } else if (failure) {
         failedDeliveries.push(failure)
-      }
-    }
-
-    // If every primary chat failed and a separate fallback chat is configured, try it.
-    if (
-      failedDeliveries.length === TELEGRAM_CHAT_IDS.length &&
-      TELEGRAM_FALLBACK_CHAT_ID &&
-      !TELEGRAM_CHAT_IDS.includes(TELEGRAM_FALLBACK_CHAT_ID)
-    ) {
-      console.warn('telegram_trying_fallback', { correlationId, fallbackChatId: TELEGRAM_FALLBACK_CHAT_ID })
-      const { sent, result, failure } = await sendToChat(
-        TELEGRAM_BOT_TOKEN, TELEGRAM_FALLBACK_CHAT_ID, text, correlationId,
-      )
-      if (sent && result) {
-        successfulDeliveries.push(result)
-        console.log('telegram_fallback_ok', { correlationId, fallbackChatId: TELEGRAM_FALLBACK_CHAT_ID })
-      } else if (failure) {
-        failedDeliveries.push(failure)
-        console.error('telegram_fallback_failed', { correlationId, fallbackChatId: TELEGRAM_FALLBACK_CHAT_ID })
       }
     }
 
