@@ -74,7 +74,9 @@ USING ( bucket_id = 'avatars' AND auth.uid() = owner );
 --
 -- ⚠️  The user must already exist in auth.users (i.e. they must have
 --    signed up / been invited first).
+
+-- soky@dagrand.net  (UID: bb3017a1-1284-44c4-b5ae-5f92645c08f5)
 UPDATE auth.users
   SET raw_user_meta_data = raw_user_meta_data || '{"role": "admin"}'::jsonb
-  WHERE email = 'soky@dagrand.net';
+  WHERE id = 'bb3017a1-1284-44c4-b5ae-5f92645c08f5';
 
