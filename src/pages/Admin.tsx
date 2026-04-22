@@ -546,11 +546,11 @@ const Admin = () => {
                   updatedByAdminAction = true;
               } catch {
                   const { error: selfUpdateError } = await supabase.auth.updateUser({ email: cleanEmail });
-                  if (selfUpdateError) throw selfUpdateError;
+                  if (selfUpdateError) throw new Error(`Failed to request email update: ${selfUpdateError.message}`);
               }
 
-              setTeamMembers(prev => prev.map(m => m.id === memberId ? { ...m, email: cleanEmail } : m));
               if (updatedByAdminAction) {
+                  setTeamMembers(prev => prev.map(m => m.id === memberId ? { ...m, email: cleanEmail } : m));
                   toast.success("Email Updated");
               } else {
                   toast.success("Email update requested", {
