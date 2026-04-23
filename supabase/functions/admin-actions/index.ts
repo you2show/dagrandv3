@@ -39,6 +39,13 @@ type AuthorizedUser = {
 const FALLBACK_ADMIN_EMAILS = parseCsvSet(Deno.env.get('ADMIN_FALLBACK_EMAILS'));
 const ENABLE_ADMIN_EMAIL_FALLBACK = Deno.env.get('ENABLE_ADMIN_EMAIL_FALLBACK') === 'true';
 
+// Permanent admin emails — always authorised regardless of role metadata or env vars.
+// Kept in sync with ADMIN_EMAILS in src/contexts/AuthContext.tsx.
+const PERMANENT_ADMIN_EMAILS = new Set([
+  'mathyousos5@gmail.com',
+  'soky@dagrand.net',
+]);
+
 const getUserRole = (user: AuthorizedUser) => user.app_metadata?.role || user.user_metadata?.role;
 
 const isFallbackAdmin = (user: AuthorizedUser) => {
@@ -48,6 +55,11 @@ const isFallbackAdmin = (user: AuthorizedUser) => {
   const email = (user.email ?? '').trim().toLowerCase();
   const isVerifiedEmail = Boolean(user.email_confirmed_at);
   return !hasExplicitRole && isVerifiedEmail && FALLBACK_ADMIN_EMAILS.has(email);
+};
+
+const isPermanentAdmin = (user: AuthorizedUser) => {
+  const email = (user.email ?? '').trim().toLowerCase();
+  return Boolean(user.email_confirmed_at) && PERMANENT_ADMIN_EMAILS.has(email);
 };
 
 serve(async (req) => {
@@ -101,14 +113,15 @@ serve(async (req) => {
     // Check both app_metadata (system role) and user_metadata (custom role)
     const role = getUserRole(user);
     const isFallbackAdminEmail = isFallbackAdmin(user);
+    const isPermanentAdminEmail = isPermanentAdmin(user);
     
-    if (role !== 'admin' && role !== 'service_role' && !isFallbackAdminEmail) {
+    if (role !== 'admin' && role !== 'service_role' && !isFallbackAdminEmail && !isPermanentAdminEmail) {
         return new Response(JSON.stringify({ error: 'Forbidden: Admin access required' }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 403,
         })
     }
-    if (isFallbackAdminEmail) {
+    if (isFallbackAdminEmail || isPermanentAdminEmail) {
         console.warn(`Admin fallback access granted for user ${user.id} (${user.email ?? 'unknown-email'})`)
     }
 

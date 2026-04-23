@@ -236,7 +236,10 @@ const Admin = () => {
           if (!fnError) {
               if (fnResult && typeof fnResult === 'object' && 'error' in fnResult && fnResult.error) {
                   if (action !== 'listUsers' && action !== 'deleteUser') {
-                      return { error: String(fnResult.error) };
+                      // For email updates, fall through to the RPC fallback instead of giving up.
+                      if (!(action === 'updateUser' && payload.attributes?.email)) {
+                          return { error: String(fnResult.error) };
+                      }
                   }
               } else {
                   return fnResult;
@@ -255,8 +258,21 @@ const Admin = () => {
               return { success: true };
           }
 
+          // RPC fallback for email updates — works even when the Edge Function is not
+          // deployed or returns a non-admin-role error.  Requires admin_update_user_email
+          // to be present in the database (see supabase/schema.sql).
+          if (action === 'updateUser' && payload.attributes?.email) {
+              const { data: rpcData, error: rpcError } = await supabase.rpc('admin_update_user_email', {
+                  target_user_id: payload.userId,
+                  new_email: payload.attributes.email
+              });
+              if (rpcError) throw new Error(rpcError.message);
+              if (rpcData?.error) throw new Error(rpcData.error);
+              return { success: true };
+          }
+
           if (action === 'updateUser' || action === 'createUser') {
-              return { error: fnError.message || `Action '${action}' failed. Please check admin-actions function deployment and permissions.` };
+              return { error: fnError?.message || `Action '${action}' failed. Please check admin-actions function deployment and permissions.` };
           }
           throw new Error(`Action '${action}' is not supported.`);
       } catch (err: any) {
@@ -527,21 +543,17 @@ const Admin = () => {
       }
 
       try {
-          const isSelf = memberId === user?.id;
-          if (isSelf) {
-              // For own email, use direct auth update — no admin Edge Function required.
-              // Note: Supabase will send a confirmation link to the new email address.
-              const { error } = await supabase.auth.updateUser({ email: cleanEmail });
-              if (error) throw error;
-          } else {
-              const data = await invokeAdminAction('updateUser', {
-                  userId: memberId,
-                  attributes: { email: cleanEmail, email_confirm: true }
-              });
-              if (data?.error) throw new Error(data.error);
-          }
+          // Use admin API for all email changes (including self) to bypass email
+          // confirmation requirement. supabase.auth.updateUser() would require
+          // clicking confirmation links in both old and new inboxes before taking effect,
+          // causing the email to silently revert on the next page refresh.
+          const data = await invokeAdminAction('updateUser', {
+              userId: memberId,
+              attributes: { email: cleanEmail, email_confirm: true }
+          });
+          if (data?.error) throw new Error(data.error);
           setTeamMembers(prev => prev.map(m => m.id === memberId ? { ...m, email: cleanEmail } : m));
-          toast.success(isSelf ? "Confirmation sent — check your new email inbox" : "Email Updated");
+          toast.success("Email Updated");
       } catch (err: any) {
           toast.error("Failed to update email", { description: err.message });
           setEditingEmailId(memberId);
