@@ -28,7 +28,17 @@ const parseCsvSet = (value: string | undefined) =>
       .filter(Boolean)
   );
 
-const isFallbackAdmin = (user: any, fallbackAdminEmails: Set<string>) => {
+type AuthorizedUser = {
+  app_metadata?: { role?: string };
+  user_metadata?: { role?: string };
+  email?: string | null;
+  email_confirmed_at?: string | null;
+};
+
+const FALLBACK_ADMIN_EMAILS = parseCsvSet(Deno.env.get('ADMIN_FALLBACK_EMAILS'));
+
+const isFallbackAdmin = (user: AuthorizedUser) => {
+  const fallbackAdminEmails = FALLBACK_ADMIN_EMAILS;
   if (fallbackAdminEmails.size === 0) return false;
   const role = user.app_metadata?.role || user.user_metadata?.role;
   const hasExplicitRole = typeof role === 'string' && role.length > 0;
@@ -87,8 +97,7 @@ serve(async (req) => {
     // ពិនិត្យមើលថា តើ User នោះមាន Role ជា 'admin' ដែរឬទេ?
     // Check both app_metadata (system role) and user_metadata (custom role)
     const role = user.app_metadata?.role || user.user_metadata?.role;
-    const fallbackAdminEmails = parseCsvSet(Deno.env.get('ADMIN_FALLBACK_EMAILS'));
-    const isFallbackAdminEmail = isFallbackAdmin(user, fallbackAdminEmails);
+    const isFallbackAdminEmail = isFallbackAdmin(user as AuthorizedUser);
     
     if (role !== 'admin' && role !== 'service_role' && !isFallbackAdminEmail) {
         return new Response(JSON.stringify({ error: 'Forbidden: Admin access required' }), {
