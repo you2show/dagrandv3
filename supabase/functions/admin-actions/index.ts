@@ -38,13 +38,12 @@ type AuthorizedUser = {
 const FALLBACK_ADMIN_EMAILS = parseCsvSet(Deno.env.get('ADMIN_FALLBACK_EMAILS'));
 
 const isFallbackAdmin = (user: AuthorizedUser) => {
-  const fallbackAdminEmails = FALLBACK_ADMIN_EMAILS;
-  if (fallbackAdminEmails.size === 0) return false;
+  if (FALLBACK_ADMIN_EMAILS.size === 0) return false;
   const role = user.app_metadata?.role || user.user_metadata?.role;
   const hasExplicitRole = typeof role === 'string' && role.length > 0;
   const email = (user.email ?? '').trim().toLowerCase();
   const isVerifiedEmail = Boolean(user.email_confirmed_at);
-  return !hasExplicitRole && isVerifiedEmail && fallbackAdminEmails.has(email);
+  return !hasExplicitRole && isVerifiedEmail && FALLBACK_ADMIN_EMAILS.has(email);
 };
 
 serve(async (req) => {
