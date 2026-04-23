@@ -95,3 +95,69 @@ UPDATE auth.users
 --   SET raw_user_meta_data = raw_user_meta_data || '{"role": "admin"}'::jsonb
 --   WHERE email = '<new-admin-email>';
 
+-- =========================================================
+-- 4. ADMIN EMAIL UPDATE FUNCTION (RPC FALLBACK)
+-- =========================================================
+-- Allows admins to update any user's email directly, bypassing the
+-- email-confirmation flow.  Used as a fallback when the admin-actions
+-- Edge Function is unavailable or returns a non-admin-role error.
+--
+-- Recognised as admin: user_metadata.role = 'admin'  OR
+--                      app_metadata.role  = 'admin'  OR
+--                      one of the two permanent admin emails below.
+
+CREATE OR REPLACE FUNCTION public.admin_update_user_email(
+    target_user_id uuid,
+    new_email       text
+)
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+DECLARE
+    caller_role   text;
+    caller_email  text;
+    admin_emails  text[] := ARRAY['mathyousos5@gmail.com', 'soky@dagrand.net'];
+    rows_updated  int;
+BEGIN
+    -- Identify calling user
+    caller_role := coalesce(
+        auth.jwt() -> 'user_metadata' ->> 'role',
+        auth.jwt() -> 'app_metadata'  ->> 'role'
+    );
+    SELECT email INTO caller_email FROM auth.users WHERE id = auth.uid();
+
+    -- Enforce admin-only access
+    IF caller_role IS DISTINCT FROM 'admin'
+       AND NOT (lower(caller_email) = ANY(admin_emails))
+    THEN
+        RETURN json_build_object('error', 'Forbidden: Admin access required');
+    END IF;
+
+    -- Apply email change without requiring confirmation
+    UPDATE auth.users
+    SET
+        email                  = new_email,
+        email_confirmed_at     = now(),
+        email_change           = '',
+        email_change_token_new = '',
+        email_change_sent_at   = NULL,
+        updated_at             = now()
+    WHERE id = target_user_id;
+
+    GET DIAGNOSTICS rows_updated = ROW_COUNT;
+
+    IF rows_updated = 0 THEN
+        RETURN json_build_object('error', 'User not found');
+    END IF;
+
+    RETURN json_build_object('success', true);
+END;
+$$;
+
+-- Allow authenticated users to invoke this function
+-- (the function body itself enforces admin-only access)
+GRANT EXECUTE ON FUNCTION public.admin_update_user_email(uuid, text) TO authenticated;
+
+
