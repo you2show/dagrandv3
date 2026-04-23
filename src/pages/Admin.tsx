@@ -527,21 +527,17 @@ const Admin = () => {
       }
 
       try {
-          const isSelf = memberId === user?.id;
-          if (isSelf) {
-              // For own email, use direct auth update — no admin Edge Function required.
-              // Note: Supabase will send a confirmation link to the new email address.
-              const { error } = await supabase.auth.updateUser({ email: cleanEmail });
-              if (error) throw error;
-          } else {
-              const data = await invokeAdminAction('updateUser', {
-                  userId: memberId,
-                  attributes: { email: cleanEmail, email_confirm: true }
-              });
-              if (data?.error) throw new Error(data.error);
-          }
+          // Use admin API for all email changes (including self) to bypass email
+          // confirmation requirement. supabase.auth.updateUser() would require
+          // clicking confirmation links in both old and new inboxes before taking effect,
+          // causing the email to silently revert on the next page refresh.
+          const data = await invokeAdminAction('updateUser', {
+              userId: memberId,
+              attributes: { email: cleanEmail, email_confirm: true }
+          });
+          if (data?.error) throw new Error(data.error);
           setTeamMembers(prev => prev.map(m => m.id === memberId ? { ...m, email: cleanEmail } : m));
-          toast.success(isSelf ? "Confirmation sent — check your new email inbox" : "Email Updated");
+          toast.success("Email Updated");
       } catch (err: any) {
           toast.error("Failed to update email", { description: err.message });
           setEditingEmailId(memberId);
