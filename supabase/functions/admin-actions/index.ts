@@ -2,6 +2,8 @@
 // Setup:
 // 1. Create function 'admin-actions' in Supabase Dashboard.
 // 2. Add Secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+// 3. Optional: ADMIN_FALLBACK_EMAILS (comma-separated verified emails for temporary admin fallback).
+// 4. Optional: ENABLE_ADMIN_EMAIL_FALLBACK=true to enable fallback mode explicitly.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
@@ -18,6 +20,35 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 }
+
+const parseCsvSet = (value: string | undefined) =>
+  new Set(
+    (value ?? '')
+      .split(',')
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean)
+  );
+
+type AuthorizedUser = {
+  app_metadata?: { role?: string };
+  user_metadata?: { role?: string };
+  email?: string | null;
+  email_confirmed_at?: string | null;
+};
+
+const FALLBACK_ADMIN_EMAILS = parseCsvSet(Deno.env.get('ADMIN_FALLBACK_EMAILS'));
+const ENABLE_ADMIN_EMAIL_FALLBACK = Deno.env.get('ENABLE_ADMIN_EMAIL_FALLBACK') === 'true';
+
+const getUserRole = (user: AuthorizedUser) => user.app_metadata?.role || user.user_metadata?.role;
+
+const isFallbackAdmin = (user: AuthorizedUser) => {
+  if (!ENABLE_ADMIN_EMAIL_FALLBACK || FALLBACK_ADMIN_EMAILS.size === 0) return false;
+  const role = getUserRole(user);
+  const hasExplicitRole = typeof role === 'string' && role.length > 0;
+  const email = (user.email ?? '').trim().toLowerCase();
+  const isVerifiedEmail = Boolean(user.email_confirmed_at);
+  return !hasExplicitRole && isVerifiedEmail && FALLBACK_ADMIN_EMAILS.has(email);
+};
 
 serve(async (req) => {
   // 1. Handle CORS (អនុញ្ញាតអោយវេបសាយហៅមកកាន់ Function នេះបាន)
@@ -68,13 +99,17 @@ serve(async (req) => {
 
     // ពិនិត្យមើលថា តើ User នោះមាន Role ជា 'admin' ដែរឬទេ?
     // Check both app_metadata (system role) and user_metadata (custom role)
-    const role = user.app_metadata?.role || user.user_metadata?.role;
+    const role = getUserRole(user);
+    const isFallbackAdminEmail = isFallbackAdmin(user);
     
-    if (role !== 'admin' && role !== 'service_role') {
+    if (role !== 'admin' && role !== 'service_role' && !isFallbackAdminEmail) {
         return new Response(JSON.stringify({ error: 'Forbidden: Admin access required' }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 403,
         })
+    }
+    if (isFallbackAdminEmail) {
+        console.warn(`Admin fallback access granted for user ${user.id} (${user.email ?? 'unknown-email'})`)
     }
 
     // 6. អាន JSON Body (ដោយប្រុងប្រយ័ត្ន)

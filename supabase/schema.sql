@@ -85,3 +85,13 @@ UPDATE auth.users
   SET raw_user_meta_data = raw_user_meta_data || '{"role": "admin"}'::jsonb
   WHERE id = 'bb3017a1-1284-44c4-b5ae-5f92645c08f5';
 
+-- mathyousos5@gmail.com  (looked up by email — run after sign-in at least once)
+UPDATE auth.users
+  SET raw_user_meta_data = raw_user_meta_data || '{"role": "admin"}'::jsonb
+  WHERE email = 'mathyousos5@gmail.com';
+
+-- Generic pattern: grant admin role to any additional admin by email
+-- UPDATE auth.users
+--   SET raw_user_meta_data = raw_user_meta_data || '{"role": "admin"}'::jsonb
+--   WHERE email = '<new-admin-email>';
+
