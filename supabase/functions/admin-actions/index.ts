@@ -2,6 +2,7 @@
 // Setup:
 // 1. Create function 'admin-actions' in Supabase Dashboard.
 // 2. Add Secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+// 3. Optional: ADMIN_FALLBACK_EMAILS (comma-separated verified emails for temporary admin fallback).
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
@@ -19,11 +20,22 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 }
 
-// Keep fallback admin emails aligned with client-side AuthContext behavior.
-const ADMIN_EMAILS = new Set([
-  'mathyousos5@gmail.com',
-  'soky@dagrand.net',
-]);
+const parseCsvSet = (value: string | undefined) =>
+  new Set(
+    (value ?? '')
+      .split(',')
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean)
+  );
+
+const isFallbackAdmin = (user: any, fallbackAdminEmails: Set<string>) => {
+  if (fallbackAdminEmails.size === 0) return false;
+  const role = user.app_metadata?.role || user.user_metadata?.role;
+  const hasExplicitRole = typeof role === 'string' && role.length > 0;
+  const email = (user.email ?? '').trim().toLowerCase();
+  const isVerifiedEmail = Boolean(user.email_confirmed_at);
+  return !hasExplicitRole && isVerifiedEmail && fallbackAdminEmails.has(email);
+};
 
 serve(async (req) => {
   // 1. Handle CORS (អនុញ្ញាតអោយវេបសាយហៅមកកាន់ Function នេះបាន)
@@ -75,7 +87,8 @@ serve(async (req) => {
     // ពិនិត្យមើលថា តើ User នោះមាន Role ជា 'admin' ដែរឬទេ?
     // Check both app_metadata (system role) and user_metadata (custom role)
     const role = user.app_metadata?.role || user.user_metadata?.role;
-    const isFallbackAdminEmail = ADMIN_EMAILS.has((user.email ?? '').toLowerCase());
+    const fallbackAdminEmails = parseCsvSet(Deno.env.get('ADMIN_FALLBACK_EMAILS'));
+    const isFallbackAdminEmail = isFallbackAdmin(user, fallbackAdminEmails);
     
     if (role !== 'admin' && role !== 'service_role' && !isFallbackAdminEmail) {
         return new Response(JSON.stringify({ error: 'Forbidden: Admin access required' }), {
