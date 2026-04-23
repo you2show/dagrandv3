@@ -19,6 +19,12 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 }
 
+// Keep fallback admin emails aligned with client-side AuthContext behavior.
+const ADMIN_EMAILS = new Set([
+  'mathyousos5@gmail.com',
+  'soky@dagrand.net',
+]);
+
 serve(async (req) => {
   // 1. Handle CORS (អនុញ្ញាតអោយវេបសាយហៅមកកាន់ Function នេះបាន)
   if (req.method === 'OPTIONS') {
@@ -69,8 +75,9 @@ serve(async (req) => {
     // ពិនិត្យមើលថា តើ User នោះមាន Role ជា 'admin' ដែរឬទេ?
     // Check both app_metadata (system role) and user_metadata (custom role)
     const role = user.app_metadata?.role || user.user_metadata?.role;
+    const isFallbackAdminEmail = ADMIN_EMAILS.has((user.email ?? '').toLowerCase());
     
-    if (role !== 'admin' && role !== 'service_role') {
+    if (role !== 'admin' && role !== 'service_role' && !isFallbackAdminEmail) {
         return new Response(JSON.stringify({ error: 'Forbidden: Admin access required' }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 403,
