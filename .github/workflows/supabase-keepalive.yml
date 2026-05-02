@@ -1,0 +1,50 @@
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    # Run every day at 08:00 UTC to prevent free-tier project from being paused
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+    steps:
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${SUPABASE_URL:-}" ]]; then
+            echo "Missing required secret: SUPABASE_URL" >&2
+            exit 1
+          fi
+          if [[ -z "${SUPABASE_ANON_KEY:-}" ]]; then
+            echo "Missing required secret: SUPABASE_ANON_KEY" >&2
+            exit 1
+          fi
+          echo "Required secrets are present."
+
+      - name: Ping Supabase (keep-alive)
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$(curl --silent --show-error --output /dev/null --write-out "%{http_code}" \
+            --max-time 30 \
+            --header "apikey: ${SUPABASE_ANON_KEY}" \
+            "${SUPABASE_URL}/auth/v1/settings")"
+
+          echo "Supabase ping response: HTTP ${status}"
+
+          if [[ "${status}" != "200" ]]; then
+            echo "Keep-alive ping failed with HTTP ${status}" >&2
+            exit 1
+          fi
+
+          echo "Supabase project is active."
