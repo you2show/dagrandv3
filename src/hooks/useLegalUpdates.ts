@@ -3,8 +3,16 @@ import { LegalUpdate } from '../../types';
 import { MOCK_UPDATES } from '../../constants';
 import { supabase } from '../lib/supabaseClient';
 
+const parseDate = (dateStr: string): number => {
+  // Normalize all-uppercase month names (e.g. "OCTOBER 21, 2025") to title case
+  // so Date.parse reliably handles them across all JS engines.
+  const normalized = dateStr.replace(/\b[A-Z]{3,}\b/g, w => w.charAt(0) + w.slice(1).toLowerCase());
+  const ms = Date.parse(normalized);
+  return isNaN(ms) ? 0 : ms;
+};
+
 const sortByDateDesc = (items: LegalUpdate[]): LegalUpdate[] =>
-  [...items].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  [...items].sort((a, b) => parseDate(b.date) - parseDate(a.date));
 
 export const useLegalUpdates = () => {
   const [updates, setUpdates] = useState<LegalUpdate[]>([]);
