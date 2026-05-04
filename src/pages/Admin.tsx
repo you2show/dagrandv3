@@ -14,6 +14,13 @@ import DOMPurify from 'dompurify';
 
 const MotionDiv = motion.div as any;
 
+// Capture invite/recovery token state from URL hash synchronously, before
+// Supabase's detectSessionInUrl clears it via an async token exchange.
+const INVITE_FROM_URL =
+    typeof window !== 'undefined' &&
+    (window.location.hash.includes('type=invite') ||
+     window.location.hash.includes('type=recovery'));
+
 // --- SECURITY: ZOD SCHEMAS ---
 const InviteSchema = z.object({
   email: z.string().email("Invalid email format"),
@@ -159,10 +166,21 @@ const Admin = () => {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState(''); 
-  const [invitePassword, setInvitePassword] = useState(''); 
+  const [invitePassword, setInvitePassword] = useState('');
   const [showInvitePassword, setShowInvitePassword] = useState(false);
   const [inviteRole, setInviteRole] = useState('editor');
   const [isInviting, setIsInviting] = useState(false);
+
+  // Set-password modal — shown automatically when a user arrives via invite link
+  const [isSetPasswordModalOpen, setIsSetPasswordModalOpen] = useState(INVITE_FROM_URL);
+  const [newSetPassword, setNewSetPassword] = useState('');
+  const [confirmSetPassword, setConfirmSetPassword] = useState('');
+  const [showSetPassword, setShowSetPassword] = useState(false);
+
+  // Fallback credentials modal — shown when Edge Function is unavailable and
+  // account is created with an auto-generated password (no invite email sent)
+  const [fallbackCredentials, setFallbackCredentials] = useState<{ email: string; password: string } | null>(null);
+  const [isSettingPassword, setIsSettingPassword] = useState(false);
 
   // Article State
   const [articles, setArticles] = useState<LegalUpdate[]>([]);
@@ -236,8 +254,8 @@ const Admin = () => {
           if (!fnError) {
               if (fnResult && typeof fnResult === 'object' && 'error' in fnResult && fnResult.error) {
                   if (action !== 'listUsers' && action !== 'deleteUser') {
-                      // For email updates, fall through to the RPC fallback instead of giving up.
-                      if (!(action === 'updateUser' && payload.attributes?.email)) {
+                      // For email updates and user creation, fall through to the RPC fallback instead of giving up.
+                      if (!(action === 'updateUser' && payload.attributes?.email) && action !== 'createUser') {
                           return { error: String(fnResult.error) };
                       }
                   }
@@ -271,7 +289,39 @@ const Admin = () => {
               return { success: true };
           }
 
-          if (action === 'updateUser' || action === 'createUser') {
+          // RPC fallback for name/metadata updates — requires admin_update_user_name
+          // to be present in the database (see supabase/schema.sql).
+          if (action === 'updateUser' && payload.attributes?.user_metadata?.full_name) {
+              const { data: rpcData, error: rpcError } = await supabase.rpc('admin_update_user_name', {
+                  target_user_id: payload.userId,
+                  new_full_name: payload.attributes.user_metadata.full_name
+              });
+              if (rpcError) throw new Error(rpcError.message);
+              if (rpcData?.error) throw new Error(rpcData.error);
+              return { success: true };
+          }
+
+          // RPC fallback for user creation — works even when the Edge Function is not
+          // deployed or unavailable.  Requires admin_create_user to be present in
+          // the database (see supabase/schema.sql).
+          if (action === 'createUser') {
+              const { data: rpcData, error: rpcError } = await supabase.rpc('admin_create_user', {
+                  new_email: payload.email,
+                  new_password: payload.password,
+                  full_name: payload.fullName || '',
+                  user_role: payload.role || 'editor'
+              });
+              if (rpcError) throw new Error(rpcError.message);
+              if (rpcData?.error) throw new Error(rpcData.error);
+              return rpcData;
+          }
+
+          // inviteUser requires the Edge Function (email delivery cannot be done via RPC)
+          if (action === 'inviteUser') {
+              throw new Error(fnError?.message || 'Email invitation requires the admin-actions Edge Function. The function may not be deployed yet.');
+          }
+
+          if (action === 'updateUser') {
               return { error: fnError?.message || `Action '${action}' failed. Please check admin-actions function deployment and permissions.` };
           }
           throw new Error(`Action '${action}' is not supported.`);
@@ -407,54 +457,60 @@ const Admin = () => {
           return;
       }
 
-      const createLocal = () => {
-          const newUser: User = {
-              id: `u${Date.now()}`,
-              name: DOMPurify.sanitize(inviteName) || "New Member",
-              email: inviteEmail,
-              role: inviteRole as 'admin' | 'editor',
-              avatar: `https://ui-avatars.com/api/?name=${inviteName || 'User'}&background=e2e8f0&color=64748b`,
-              password: invitePassword 
-          };
-          addUser(newUser); 
-          // Update local team members list immediately
-          setTeamMembers(prev => [...prev, newUser]); 
-          toast.success('User Invited Successfully', { 
-              description: `Credentials: ${inviteEmail} / ${invitePassword}`,
-              duration: 5000
-          });
-          resetInviteForm();
-          setIsInviteModalOpen(false);
-          setIsInviting(false);
-      };
+      const cleanName = DOMPurify.sanitize(inviteName.trim());
 
       if (isMockMode || !supabase) {
-          createLocal();
+          // Mock mode: create a local user — can login immediately within this session
+          const newUser: User = {
+              id: `u${Date.now()}`,
+              name: cleanName || "New Member",
+              email: inviteEmail,
+              role: inviteRole as 'admin' | 'editor',
+              avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName || 'User')}&background=e2e8f0&color=64748b`,
+              password: invitePassword
+          };
+          addUser(newUser);
+          setTeamMembers(prev => [...prev, newUser]);
+          setFallbackCredentials({ email: inviteEmail, password: invitePassword });
+          resetInviteForm();
+          setIsInviting(false);
           return;
       }
 
+      // Primary: createUser with email_confirm: true — account is active immediately.
+      // The member can login right away with the provided email + password.
       try {
           const data = await invokeAdminAction('createUser', {
               email: inviteEmail,
               password: invitePassword,
-              fullName: DOMPurify.sanitize(inviteName),
+              fullName: cleanName,
               role: inviteRole
           });
-
           if (data && data.error) throw new Error(data.error);
 
-          toast.success('User Created Successfully', { 
-              description: `User added to Supabase. Login with: ${inviteEmail}` 
-          });
-          
+          // Show credentials modal so admin can share them with the member
+          setFallbackCredentials({ email: inviteEmail, password: invitePassword });
           await fetchTeamMembers();
           resetInviteForm();
 
+          // Best-effort: also send a notification email via inviteUser so the member
+          // is informed — but we intentionally ignore any errors here because
+          // the account is already created and login-ready regardless.
+          try {
+              await invokeAdminAction('inviteUser', {
+                  email: inviteEmail,
+                  fullName: cleanName,
+                  role: inviteRole,
+                  redirectTo: `${window.location.origin}/admin`
+              });
+          } catch (_notifyErr) {
+              // Notification email optional — account already usable without it
+          }
       } catch (err: any) {
-          toast.warning("Backend Sync Failed", { 
-              description: err.message || "The user was created in browser memory only. Please deploy the Edge Function to sync with Supabase Auth." 
+          toast.error("Failed to Add Member", {
+              description: err.message || "Could not create the account. Please contact your system administrator.",
+              duration: 8000
           });
-          createLocal();
       } finally {
           setIsInviting(false);
       }
@@ -464,9 +520,38 @@ const Admin = () => {
       setIsInviting(false);
       setIsInviteModalOpen(false);
       setInviteEmail('');
-      setInvitePassword('');
       setInviteName('');
+      setInvitePassword('');
       setShowInvitePassword(false);
+  };
+
+  /** Called when an invited user sets their password after arriving via the invite link */
+  const handleSetPassword = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!supabase) return;
+
+      if (newSetPassword.length < 6) {
+          toast.error("Password too short", { description: "Password must be at least 6 characters." });
+          return;
+      }
+      if (newSetPassword !== confirmSetPassword) {
+          toast.error("Passwords don't match");
+          return;
+      }
+
+      setIsSettingPassword(true);
+      try {
+          const { error } = await supabase.auth.updateUser({ password: newSetPassword });
+          if (error) throw error;
+          toast.success('Password set! 🎉', { description: 'Your account is ready. Welcome to the team!' });
+          setIsSetPasswordModalOpen(false);
+          setNewSetPassword('');
+          setConfirmSetPassword('');
+      } catch (err: any) {
+          toast.error('Failed to set password', { description: err.message });
+      } finally {
+          setIsSettingPassword(false);
+      }
   };
 
   const toggleRole = async (memberId: string, currentRole: string) => {
@@ -1442,6 +1527,11 @@ const Admin = () => {
                             <button onClick={() => setIsInviteModalOpen(false)} className="text-white/50 hover:text-white"><X className="h-5 w-5" /></button>
                         </div>
                         <form onSubmit={handleInvite} className="p-6 space-y-4">
+                            {/* Info banner */}
+                            <div className="flex items-start gap-2 bg-green-50 border border-green-100 rounded-lg px-3 py-2.5 text-green-800 text-xs">
+                                <Check className="h-4 w-4 mt-0.5 shrink-0 text-green-500" />
+                                <span>The account will be <strong>ready to use immediately</strong>. Share the email and password with the member so they can login right away — no email confirmation needed.</span>
+                            </div>
                             <div className="space-y-1.5">
                                 <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Full Name</label>
                                 <div className="relative">
@@ -1474,17 +1564,18 @@ const Admin = () => {
                                 <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Password</label>
                                 <div className="relative">
                                     <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                                    <input 
-                                        type={showInvitePassword ? "text" : "password"} 
-                                        value={invitePassword} 
-                                        onChange={e => setInvitePassword(e.target.value)} 
-                                        className="w-full pl-10 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:border-brand-navy focus:bg-white outline-none" 
-                                        placeholder="••••••••" 
-                                        required 
+                                    <input
+                                        type={showInvitePassword ? "text" : "password"}
+                                        value={invitePassword}
+                                        onChange={e => setInvitePassword(e.target.value)}
+                                        className="w-full pl-10 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:border-brand-navy focus:bg-white outline-none"
+                                        placeholder="Min. 6 characters"
+                                        required
+                                        minLength={6}
                                     />
-                                    <button 
+                                    <button
                                         type="button"
-                                        onClick={() => setShowInvitePassword(!showInvitePassword)}
+                                        onClick={() => setShowInvitePassword(p => !p)}
                                         className="absolute right-3 top-3 text-gray-400 hover:text-brand-navy"
                                     >
                                         {showInvitePassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -1520,6 +1611,123 @@ const Admin = () => {
                                 </button>
                             </div>
                         </form>
+                    </MotionDiv>
+                </div>
+            )}
+        </AnimatePresence>
+
+        {/* Set-Password modal — shown when user arrives via an invite link */}
+        <AnimatePresence>
+            {isSetPasswordModalOpen && isAuthenticated && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-brand-navy/70 backdrop-blur-sm" />
+                    <MotionDiv
+                        initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                        animate={{ scale: 1, opacity: 1, y: 0 }}
+                        exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                        className="bg-white w-full max-w-sm rounded-xl shadow-2xl relative z-10 overflow-hidden"
+                    >
+                        <div className="bg-brand-navy p-6 text-center">
+                            <UserPlus className="h-8 w-8 text-brand-gold mx-auto mb-2" />
+                            <h3 className="text-white font-serif font-bold text-xl">Welcome to the Team!</h3>
+                            <p className="text-white/70 text-sm mt-1">Please set a password to complete your account.</p>
+                        </div>
+                        <form onSubmit={handleSetPassword} className="p-6 space-y-4">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">New Password</label>
+                                <div className="relative">
+                                    <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                                    <input
+                                        type={showSetPassword ? "text" : "password"}
+                                        value={newSetPassword}
+                                        onChange={e => setNewSetPassword(e.target.value)}
+                                        className="w-full pl-10 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:border-brand-navy focus:bg-white outline-none"
+                                        placeholder="Min. 6 characters"
+                                        required
+                                        minLength={6}
+                                        autoFocus
+                                    />
+                                    <button type="button" onClick={() => setShowSetPassword(p => !p)} className="absolute right-3 top-3 text-gray-400 hover:text-brand-navy">
+                                        {showSetPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Confirm Password</label>
+                                <div className="relative">
+                                    <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                                    <input
+                                        type={showSetPassword ? "text" : "password"}
+                                        value={confirmSetPassword}
+                                        onChange={e => setConfirmSetPassword(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:border-brand-navy focus:bg-white outline-none"
+                                        placeholder="Repeat password"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={isSettingPassword}
+                                className="w-full bg-brand-gold text-white font-bold py-3.5 rounded-lg text-sm hover:bg-brand-navy transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                            >
+                                {isSettingPassword ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Check className="h-4 w-4" /> Set Password & Join</>}
+                            </button>
+                        </form>
+                    </MotionDiv>
+                </div>
+            )}
+        </AnimatePresence>
+
+        {/* Fallback credentials modal — shown when invite email could not be sent */}
+        <AnimatePresence>
+            {fallbackCredentials && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setFallbackCredentials(null)} />
+                    <MotionDiv
+                        initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                        animate={{ scale: 1, opacity: 1, y: 0 }}
+                        exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                        className="bg-white w-full max-w-sm rounded-xl shadow-2xl relative z-10 overflow-hidden"
+                    >
+                        <div className="bg-amber-600 p-5 flex items-start gap-3">
+                            <Info className="h-5 w-5 text-white shrink-0 mt-0.5" />
+                            <div>
+                                <h3 className="text-white font-bold text-base">Share Credentials Manually</h3>
+                                <p className="text-white/80 text-xs mt-0.5">The invitation email could not be sent. Please share the following login details with the member securely (e.g. via a private message).</p>
+                            </div>
+                        </div>
+                        <div className="p-6 space-y-3">
+                            <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 space-y-2 font-mono text-sm">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-gray-400 text-xs w-16 shrink-0">Email</span>
+                                    <span className="font-bold text-gray-800 break-all">{fallbackCredentials.email}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-gray-400 text-xs w-16 shrink-0">Password</span>
+                                    <span className="font-bold text-gray-800">{fallbackCredentials.password}</span>
+                                </div>
+                            </div>
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        await navigator.clipboard.writeText(`Email: ${fallbackCredentials.email}\nPassword: ${fallbackCredentials.password}`);
+                                        toast.success('Copied to clipboard');
+                                    } catch {
+                                        toast.error('Copy failed', { description: 'Please copy the credentials manually.' });
+                                    }
+                                }}
+                                className="w-full border border-gray-200 text-gray-700 text-sm font-bold py-2.5 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+                            >
+                                <Check className="h-4 w-4" /> Copy to Clipboard
+                            </button>
+                            <button
+                                onClick={() => setFallbackCredentials(null)}
+                                className="w-full bg-brand-navy text-white text-sm font-bold py-2.5 rounded-lg hover:bg-brand-gold transition-colors"
+                            >
+                                Done
+                            </button>
+                        </div>
                     </MotionDiv>
                 </div>
             )}
