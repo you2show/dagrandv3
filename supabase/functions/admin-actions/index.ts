@@ -147,6 +147,17 @@ serve(async (req) => {
             result = { users: users.users }
             break
 
+        case 'inviteUser': {
+            const { email: invEmail, fullName: invFullName, role: invRole, redirectTo: invRedirectTo } = payload
+            const { data: invData, error: invError } = await supabaseAdmin.auth.admin.inviteUserByEmail(invEmail, {
+                data: { full_name: invFullName, role: invRole },
+                redirectTo: invRedirectTo || ''
+            })
+            if (invError) throw invError
+            result = { user: invData.user }
+            break
+        }
+
         case 'createUser':
             const { email, password, fullName, role } = payload
             const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({

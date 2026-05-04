@@ -294,3 +294,60 @@ $$;
 -- (the function body itself enforces admin-only access)
 GRANT EXECUTE ON FUNCTION public.admin_create_user(text, text, text, text) TO authenticated;
 
+
+-- =========================================================
+-- 6. ADMIN UPDATE USER NAME FUNCTION (RPC FALLBACK)
+-- =========================================================
+-- Allows admins to rename any user's display name directly in the
+-- database, bypassing the admin-actions Edge Function.  Used as a
+-- fallback when the Edge Function is unavailable or not yet deployed.
+
+CREATE OR REPLACE FUNCTION public.admin_update_user_name(
+    target_user_id uuid,
+    new_full_name   text
+)
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+DECLARE
+    caller_role   text;
+    caller_email  text;
+    admin_emails  text[] := ARRAY['mathyousos5@gmail.com', 'soky@dagrand.net'];
+    rows_updated  int;
+BEGIN
+    -- Identify calling user
+    caller_role := coalesce(
+        auth.jwt() -> 'user_metadata' ->> 'role',
+        auth.jwt() -> 'app_metadata'  ->> 'role'
+    );
+    SELECT email INTO caller_email FROM auth.users WHERE id = auth.uid();
+
+    -- Enforce admin-only access
+    IF caller_role IS DISTINCT FROM 'admin'
+       AND NOT (lower(caller_email) = ANY(admin_emails))
+    THEN
+        RETURN json_build_object('error', 'Forbidden: Admin access required');
+    END IF;
+
+    -- Apply name change
+    UPDATE auth.users
+    SET
+        raw_user_meta_data = raw_user_meta_data || jsonb_build_object('full_name', new_full_name),
+        updated_at         = now()
+    WHERE id = target_user_id;
+
+    GET DIAGNOSTICS rows_updated = ROW_COUNT;
+
+    IF rows_updated = 0 THEN
+        RETURN json_build_object('error', 'User not found');
+    END IF;
+
+    RETURN json_build_object('success', true);
+END;
+$$;
+
+-- Allow authenticated users to invoke this function
+-- (the function body itself enforces admin-only access)
+GRANT EXECUTE ON FUNCTION public.admin_update_user_name(uuid, text) TO authenticated;
