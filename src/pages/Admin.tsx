@@ -25,6 +25,7 @@ const INVITE_FROM_URL =
 const InviteSchema = z.object({
   email: z.string().email("Invalid email format"),
   name: z.string().min(2, "Name must be at least 2 chars").max(50, "Name too long"),
+  password: z.string().min(6, "Password must be at least 6 chars").max(100),
   role: z.enum(['admin', 'editor'])
 });
 
@@ -165,6 +166,8 @@ const Admin = () => {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState(''); 
+  const [invitePassword, setInvitePassword] = useState('');
+  const [showInvitePassword, setShowInvitePassword] = useState(false);
   const [inviteRole, setInviteRole] = useState('editor');
   const [isInviting, setIsInviting] = useState(false);
 
@@ -443,6 +446,7 @@ const Admin = () => {
       const validationResult = InviteSchema.safeParse({
           email: inviteEmail,
           name: inviteName,
+          password: invitePassword,
           role: inviteRole
       });
 
@@ -456,65 +460,52 @@ const Admin = () => {
       const cleanName = DOMPurify.sanitize(inviteName.trim());
 
       if (isMockMode || !supabase) {
-          // Mock mode: create a local placeholder — no real email can be sent
+          // Mock mode: create a local user — can login immediately within this session
           const newUser: User = {
               id: `u${Date.now()}`,
               name: cleanName || "New Member",
               email: inviteEmail,
               role: inviteRole as 'admin' | 'editor',
               avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName || 'User')}&background=e2e8f0&color=64748b`,
+              password: invitePassword
           };
           addUser(newUser);
           setTeamMembers(prev => [...prev, newUser]);
-          toast.success('User Added (Mock)', {
-              description: `Mock mode: no email sent. Member visible in this session only.`,
-              duration: 5000
-          });
+          setFallbackCredentials({ email: inviteEmail, password: invitePassword });
           resetInviteForm();
           setIsInviting(false);
           return;
       }
 
-      const redirectTo = `${window.location.origin}/admin`;
-
-      // 1. Try email invitation via Edge Function (preferred — sends real invite email)
+      // Primary: createUser with email_confirm: true — account is active immediately.
+      // The member can login right away with the provided email + password.
       try {
-          const inviteData = await invokeAdminAction('inviteUser', {
-              email: inviteEmail,
-              fullName: cleanName,
-              role: inviteRole,
-              redirectTo
-          });
-          if (inviteData && inviteData.error) throw new Error(inviteData.error);
-
-          toast.success('Invitation Sent! ✉️', {
-              description: `An invitation email has been sent to ${inviteEmail}. They can click the link to set their password and join.`,
-              duration: 8000
-          });
-          await fetchTeamMembers();
-          resetInviteForm();
-          return;
-      } catch (_inviteErr: any) {
-          // Edge Function not deployed or not available — fall through to direct account creation
-      }
-
-      // 2. Fallback: create account with auto-generated password (no email sent)
-      try {
-          const autoPassword = generatePassword();
           const data = await invokeAdminAction('createUser', {
               email: inviteEmail,
-              password: autoPassword,
+              password: invitePassword,
               fullName: cleanName,
               role: inviteRole
           });
           if (data && data.error) throw new Error(data.error);
 
-          toast.success('Account Created', {
-              description: `Invitation email could not be sent. See the credentials popup to share login details manually.`,
-          });
-          setFallbackCredentials({ email: inviteEmail, password: autoPassword });
+          // Show credentials modal so admin can share them with the member
+          setFallbackCredentials({ email: inviteEmail, password: invitePassword });
           await fetchTeamMembers();
           resetInviteForm();
+
+          // Best-effort: also send a notification email via inviteUser so the member
+          // is informed — but we intentionally ignore any errors here because
+          // the account is already created and login-ready regardless.
+          try {
+              await invokeAdminAction('inviteUser', {
+                  email: inviteEmail,
+                  fullName: cleanName,
+                  role: inviteRole,
+                  redirectTo: `${window.location.origin}/admin`
+              });
+          } catch (_notifyErr) {
+              // Notification email optional — account already usable without it
+          }
       } catch (err: any) {
           toast.error("Failed to Add Member", {
               description: err.message || "Could not create the account. Please contact your system administrator.",
@@ -525,19 +516,13 @@ const Admin = () => {
       }
   };
 
-  /** Generates a cryptographically random password for the direct-create fallback path */
-  const generatePassword = () => {
-      const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#';
-      const bytes = new Uint8Array(12);
-      crypto.getRandomValues(bytes);
-      return Array.from(bytes, b => chars[b % chars.length]).join('');
-  };
-
   const resetInviteForm = () => {
       setIsInviting(false);
       setIsInviteModalOpen(false);
       setInviteEmail('');
       setInviteName('');
+      setInvitePassword('');
+      setShowInvitePassword(false);
   };
 
   /** Called when an invited user sets their password after arriving via the invite link */
@@ -1543,9 +1528,9 @@ const Admin = () => {
                         </div>
                         <form onSubmit={handleInvite} className="p-6 space-y-4">
                             {/* Info banner */}
-                            <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2.5 text-blue-800 text-xs">
-                                <Mail className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
-                                <span>An invitation email will be sent automatically. The member clicks <strong>Join</strong> in the email and sets their own password.</span>
+                            <div className="flex items-start gap-2 bg-green-50 border border-green-100 rounded-lg px-3 py-2.5 text-green-800 text-xs">
+                                <Check className="h-4 w-4 mt-0.5 shrink-0 text-green-500" />
+                                <span>The account will be <strong>ready to use immediately</strong>. Share the email and password with the member so they can login right away — no email confirmation needed.</span>
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Full Name</label>
@@ -1573,6 +1558,28 @@ const Admin = () => {
                                         placeholder="john@example.com" 
                                         required 
                                     />
+                                </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Password</label>
+                                <div className="relative">
+                                    <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                                    <input
+                                        type={showInvitePassword ? "text" : "password"}
+                                        value={invitePassword}
+                                        onChange={e => setInvitePassword(e.target.value)}
+                                        className="w-full pl-10 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:border-brand-navy focus:bg-white outline-none"
+                                        placeholder="Min. 6 characters"
+                                        required
+                                        minLength={6}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowInvitePassword(p => !p)}
+                                        className="absolute right-3 top-3 text-gray-400 hover:text-brand-navy"
+                                    >
+                                        {showInvitePassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    </button>
                                 </div>
                             </div>
                             <div className="space-y-1.5">
@@ -1702,9 +1709,13 @@ const Admin = () => {
                                 </div>
                             </div>
                             <button
-                                onClick={() => {
-                                    navigator.clipboard?.writeText(`Email: ${fallbackCredentials.email}\nPassword: ${fallbackCredentials.password}`);
-                                    toast.success('Copied to clipboard');
+                                onClick={async () => {
+                                    try {
+                                        await navigator.clipboard.writeText(`Email: ${fallbackCredentials.email}\nPassword: ${fallbackCredentials.password}`);
+                                        toast.success('Copied to clipboard');
+                                    } catch {
+                                        toast.error('Copy failed', { description: 'Please copy the credentials manually.' });
+                                    }
                                 }}
                                 className="w-full border border-gray-200 text-gray-700 text-sm font-bold py-2.5 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
                             >
