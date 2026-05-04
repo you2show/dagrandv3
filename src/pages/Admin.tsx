@@ -236,8 +236,8 @@ const Admin = () => {
           if (!fnError) {
               if (fnResult && typeof fnResult === 'object' && 'error' in fnResult && fnResult.error) {
                   if (action !== 'listUsers' && action !== 'deleteUser') {
-                      // For email updates, fall through to the RPC fallback instead of giving up.
-                      if (!(action === 'updateUser' && payload.attributes?.email)) {
+                      // For email updates and user creation, fall through to the RPC fallback instead of giving up.
+                      if (!(action === 'updateUser' && payload.attributes?.email) && action !== 'createUser') {
                           return { error: String(fnResult.error) };
                       }
                   }
@@ -271,7 +271,22 @@ const Admin = () => {
               return { success: true };
           }
 
-          if (action === 'updateUser' || action === 'createUser') {
+          // RPC fallback for user creation — works even when the Edge Function is not
+          // deployed or unavailable.  Requires admin_create_user to be present in
+          // the database (see supabase/schema.sql).
+          if (action === 'createUser') {
+              const { data: rpcData, error: rpcError } = await supabase.rpc('admin_create_user', {
+                  new_email: payload.email,
+                  new_password: payload.password,
+                  full_name: payload.fullName || '',
+                  user_role: payload.role || 'editor'
+              });
+              if (rpcError) throw new Error(rpcError.message);
+              if (rpcData?.error) throw new Error(rpcData.error);
+              return rpcData;
+          }
+
+          if (action === 'updateUser') {
               return { error: fnError?.message || `Action '${action}' failed. Please check admin-actions function deployment and permissions.` };
           }
           throw new Error(`Action '${action}' is not supported.`);
@@ -451,10 +466,10 @@ const Admin = () => {
           resetInviteForm();
 
       } catch (err: any) {
-          toast.warning("Backend Sync Failed", { 
-              description: err.message || "The user was created in browser memory only. Please deploy the Edge Function to sync with Supabase Auth." 
+          toast.error("Failed to Create User", { 
+              description: err.message || "Could not create the user. Please contact your system administrator.",
+              duration: 8000
           });
-          createLocal();
       } finally {
           setIsInviting(false);
       }

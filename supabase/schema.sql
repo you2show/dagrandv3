@@ -161,3 +161,136 @@ $$;
 GRANT EXECUTE ON FUNCTION public.admin_update_user_email(uuid, text) TO authenticated;
 
 
+-- =========================================================
+-- 5. ADMIN CREATE USER FUNCTION (RPC FALLBACK)
+-- =========================================================
+-- Allows admins to create a new auth user directly in the database,
+-- bypassing the admin-actions Edge Function.  Used as a fallback when
+-- the Edge Function is unavailable or not yet deployed.
+--
+-- Recognised as admin: user_metadata.role = 'admin'  OR
+--                      app_metadata.role  = 'admin'  OR
+--                      one of the two permanent admin emails below.
+--
+-- Requires the pgcrypto extension (pre-installed on all Supabase projects).
+
+CREATE OR REPLACE FUNCTION public.admin_create_user(
+    new_email    text,
+    new_password text,
+    full_name    text DEFAULT '',
+    user_role    text DEFAULT 'editor'
+)
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth, extensions
+AS $$
+DECLARE
+    caller_role      text;
+    caller_email     text;
+    admin_emails     text[] := ARRAY['mathyousos5@gmail.com', 'soky@dagrand.net'];
+    new_user_id      uuid;
+    existing_user_id uuid;
+    clean_email      text;
+BEGIN
+    -- Identify calling user
+    caller_role := coalesce(
+        auth.jwt() -> 'user_metadata' ->> 'role',
+        auth.jwt() -> 'app_metadata'  ->> 'role'
+    );
+    SELECT email INTO caller_email FROM auth.users WHERE id = auth.uid();
+
+    -- Enforce admin-only access
+    IF caller_role IS DISTINCT FROM 'admin'
+       AND NOT (lower(caller_email) = ANY(admin_emails))
+    THEN
+        RETURN json_build_object('error', 'Forbidden: Admin access required');
+    END IF;
+
+    clean_email := lower(trim(new_email));
+
+    -- Check if email already exists
+    SELECT id INTO existing_user_id FROM auth.users WHERE email = clean_email;
+    IF existing_user_id IS NOT NULL THEN
+        RETURN json_build_object('error', 'A user with this email address already exists');
+    END IF;
+
+    new_user_id := gen_random_uuid();
+
+    -- Insert new user into auth.users
+    INSERT INTO auth.users (
+        id,
+        instance_id,
+        aud,
+        role,
+        email,
+        encrypted_password,
+        email_confirmed_at,
+        raw_user_meta_data,
+        raw_app_meta_data,
+        created_at,
+        updated_at,
+        confirmation_token,
+        email_change,
+        email_change_token_new,
+        recovery_token
+    ) VALUES (
+        new_user_id,
+        '00000000-0000-0000-0000-000000000000',
+        'authenticated',
+        'authenticated',
+        clean_email,
+        crypt(new_password, gen_salt('bf')),
+        now(),
+        json_build_object('full_name', full_name, 'role', user_role)::jsonb,
+        json_build_object('provider', 'email', 'providers', ARRAY['email'])::jsonb,
+        now(),
+        now(),
+        '',
+        '',
+        '',
+        ''
+    );
+
+    -- Insert identity record so the user can sign in with email/password
+    BEGIN
+        INSERT INTO auth.identities (
+            provider_id,
+            user_id,
+            identity_data,
+            provider,
+            last_sign_in_at,
+            created_at,
+            updated_at
+        ) VALUES (
+            clean_email,
+            new_user_id,
+            json_build_object('sub', new_user_id::text, 'email', clean_email)::jsonb,
+            'email',
+            now(),
+            now(),
+            now()
+        );
+    EXCEPTION WHEN others THEN
+        -- Log the error so it surfaces in Supabase function logs.
+        -- Identities table schema may vary across Supabase versions; the user
+        -- record in auth.users was already created so they can still be found,
+        -- but sign-in may require re-linking via the Supabase dashboard.
+        RAISE WARNING 'admin_create_user: failed to insert auth.identities for user % (%): %',
+            new_user_id, clean_email, SQLERRM;
+    END;
+
+    RETURN json_build_object(
+        'user', json_build_object(
+            'id', new_user_id,
+            'email', clean_email,
+            'user_metadata', json_build_object('full_name', full_name, 'role', user_role)
+        )
+    );
+END;
+$$;
+
+-- Allow authenticated users to invoke this function
+-- (the function body itself enforces admin-only access)
+GRANT EXECUTE ON FUNCTION public.admin_create_user(text, text, text, text) TO authenticated;
+
