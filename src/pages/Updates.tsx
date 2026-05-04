@@ -20,7 +20,11 @@ const Updates = () => {
   const MotionDiv = motion.div as any;
 
   // Extract unique years from data for filter
-  const years = Array.from(new Set(updates.map(u => u.date.split(',')[1].trim()))).sort().reverse();
+  const years = Array.from(new Set(
+    updates
+      .map(u => { const parts = u.date.split(','); return parts.length > 1 ? parts[1].trim() : ''; })
+      .filter(Boolean)
+  )).sort().reverse();
 
   // Filter Logic
   const filteredUpdates = updates.filter(update => {

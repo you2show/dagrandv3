@@ -214,7 +214,7 @@ const UpdateDetail = () => {
                        <ArrowLeft className="h-4 w-4" /> Back to Updates
                    </Link>
                    
-                   <h1 className="text-3xl md:text-5xl lg:text-6xl font-serif font-bold text-white mb-6 leading-tight max-w-4xl drop-shadow-lg">
+                   <h1 className="text-xl md:text-2xl lg:text-3xl font-serif font-bold text-white mb-6 leading-tight max-w-4xl drop-shadow-lg">
                        {update.title}
                    </h1>
                    <div className="flex flex-wrap items-center gap-6 text-white/90 text-sm font-medium">
@@ -256,7 +256,7 @@ const UpdateDetail = () => {
                                     return (
                                         <div
                                             key={idx}
-                                            className="mb-8 text-justify leading-loose text-gray-700 dark:text-gray-300 font-light break-words"
+                                            className="article-body mb-8 text-justify leading-loose text-gray-700 dark:text-gray-300 font-light break-words"
                                             dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(normalized) }}
                                         />
                                     );
