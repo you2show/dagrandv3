@@ -144,9 +144,9 @@ const RichTextEditor = ({ value, onChange, placeholder }: { value: string, onCha
         }
     };
 
-    const exec = (command: string, val: string = '') => {
+    const exec = (command: string, value: string = '') => {
         editorRef.current?.focus();
-        document.execCommand(command, false, val);
+        document.execCommand(command, false, value);
         if (editorRef.current) {
             isInternalChange.current = true;
             onChange(editorRef.current.innerHTML);
@@ -190,7 +190,8 @@ const RichTextEditor = ({ value, onChange, placeholder }: { value: string, onCha
                 <ToolbarButton onClick={() => exec('redo')} icon={<Redo className="w-4 h-4"/>} title="Redo" />
             </div>
             
-            {/* Editor Area */}
+            {/* Editor Area — suppressContentEditableWarning is intentional: we manage
+                innerHTML directly via refs and useEffect instead of React children. */}
             <div
                 ref={editorRef}
                 className="prose prose-sm max-w-none p-5 min-h-[400px] outline-none text-gray-700 font-light leading-relaxed cursor-text rich-editor-content"
