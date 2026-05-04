@@ -256,7 +256,7 @@ const UpdateDetail = () => {
                                     return (
                                         <div
                                             key={idx}
-                                            className="mb-8 text-justify leading-loose text-gray-700 dark:text-gray-300 font-light break-words"
+                                            className="article-body mb-8 text-justify leading-loose text-gray-700 dark:text-gray-300 font-light break-words"
                                             dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(normalized) }}
                                         />
                                     );

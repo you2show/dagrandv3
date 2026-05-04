@@ -48,30 +48,85 @@ const ArticleSchema = z.object({
 const RichTextEditor = ({ value, onChange, placeholder }: { value: string, onChange: (val: string) => void, placeholder: string }) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const [isFocused, setIsFocused] = useState(false);
+    // Tracks whether the current onChange call originated inside the editor (user typing / paste / toolbar).
+    // When true we skip the next useEffect sync to avoid resetting innerHTML — which would
+    // discard the cursor position and make the editor feel laggy/broken.
+    const isInternalChange = useRef(false);
 
     const sanitizeEditorHtml = (html: string) =>
         DOMPurify.sanitize(html, { USE_PROFILES: { html: true } }).replace(/&nbsp;/g, ' ');
 
-    // Initial value sync
+    // Sync value → innerHTML only when the change comes from outside the editor
+    // (e.g. opening an article to edit, or a toolbar action that resets state).
     useEffect(() => {
-        if (editorRef.current && editorRef.current.innerHTML !== value) {
+        if (isInternalChange.current) {
+            isInternalChange.current = false;
+            return;
+        }
+        if (editorRef.current) {
             const sanitizedValue = value ? sanitizeEditorHtml(value) : '';
-            editorRef.current.innerHTML = sanitizedValue;
+            // Avoid a no-op DOM write that still resets the cursor
+            if (editorRef.current.innerHTML !== sanitizedValue) {
+                editorRef.current.innerHTML = sanitizedValue;
+            }
         }
     }, [value]);
 
     const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
         const content = sanitizeEditorHtml(e.currentTarget.innerHTML);
         if (content !== value) {
+            isInternalChange.current = true;
             onChange(content);
         }
+    };
+
+    // Converts Word / rich-text HTML into clean, semantic HTML that the prose
+    // renderer understands, while stripping Microsoft Office cruft.
+    const cleanWordHtml = (html: string): string => {
+        // Remove Word conditional comments and mso-* XML
+        let cleaned = html
+            .replace(/<!--\[if[\s\S]*?\[endif\]-->/gi, '')
+            .replace(/<!\[if[\s\S]*?<!\[endif\]>/gi, '')
+            .replace(/<o:p[\s\S]*?<\/o:p>/gi, '')
+            .replace(/<w:[^>]*>[\s\S]*?<\/w:[^>]*>/gi, '')
+            .replace(/<m:[^>]*>[\s\S]*?<\/m:[^>]*>/gi, '');
+
+        // Parse with the browser and extract the body
+        const doc = new DOMParser().parseFromString(cleaned, 'text/html');
+
+        // Convert mso-list-indented spans/paragraphs to proper <ul>/<li>
+        // Word sometimes encodes lists as <p class="MsoListParagraph"> with a leading "·" span.
+        // We leave that to the sanitizer since DOMPurify will keep the semantic tags.
+
+        // Strip all style / class / lang / xml:space attributes but keep semantic tags
+        doc.querySelectorAll('*').forEach(el => {
+            el.removeAttribute('style');
+            el.removeAttribute('class');
+            el.removeAttribute('lang');
+            el.removeAttribute('xml:space');
+            el.removeAttribute('valign');
+        });
+
+        return doc.body.innerHTML;
     };
 
     const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
         e.preventDefault();
         const html = e.clipboardData.getData('text/html');
         const text = e.clipboardData.getData('text/plain');
-        const pastedContent = html && html.trim() ? html : text;
+
+        let pastedContent: string;
+        if (html && html.trim()) {
+            // Prefer HTML from clipboard (preserves bold, lists, etc.) but clean Word garbage first
+            pastedContent = cleanWordHtml(html);
+        } else {
+            // Fall back to plain text — convert newlines to <br> so paragraphs are preserved
+            pastedContent = text
+                .split(/\n{2,}/)
+                .map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
+                .join('');
+        }
+
         const sanitized = sanitizeEditorHtml(pastedContent);
         const selection = window.getSelection();
         if (selection && selection.rangeCount > 0) {
@@ -84,14 +139,16 @@ const RichTextEditor = ({ value, onChange, placeholder }: { value: string, onCha
             selection.addRange(range);
         }
         if (editorRef.current) {
+            isInternalChange.current = true;
             onChange(sanitizeEditorHtml(editorRef.current.innerHTML));
         }
     };
 
-    const exec = (command: string, value: string = '') => {
-        document.execCommand(command, false, value);
+    const exec = (command: string, val: string = '') => {
+        editorRef.current?.focus();
+        document.execCommand(command, false, val);
         if (editorRef.current) {
-            editorRef.current.focus();
+            isInternalChange.current = true;
             onChange(editorRef.current.innerHTML);
         }
     };
@@ -99,7 +156,11 @@ const RichTextEditor = ({ value, onChange, placeholder }: { value: string, onCha
     const ToolbarButton = ({ onClick, icon, active = false, title }: any) => (
         <button 
             type="button" 
-            onClick={(e) => { e.preventDefault(); onClick(); }} 
+            onMouseDown={(e) => {
+                // Prevent the editor from losing focus when clicking toolbar buttons
+                e.preventDefault();
+                onClick();
+            }}
             title={title}
             className={`p-2 rounded-md transition-all duration-200 ${active ? 'bg-brand-navy text-white' : 'text-gray-500 hover:bg-gray-100 hover:text-brand-navy'}`}
         >
@@ -132,8 +193,9 @@ const RichTextEditor = ({ value, onChange, placeholder }: { value: string, onCha
             {/* Editor Area */}
             <div
                 ref={editorRef}
-                className="prose prose-sm max-w-none p-5 min-h-[400px] outline-none text-gray-700 font-light leading-relaxed cursor-text"
+                className="prose prose-sm max-w-none p-5 min-h-[400px] outline-none text-gray-700 font-light leading-relaxed cursor-text rich-editor-content"
                 contentEditable
+                suppressContentEditableWarning
                 onInput={handleInput}
                 onPaste={handlePaste}
                 onFocus={() => setIsFocused(true)}
