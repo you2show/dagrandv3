@@ -96,7 +96,7 @@ export const CONTACT_INFO = {
   },
   phones: [
     { label: "Khmer, English, French", number: "+855 (0)98 539 910" },
-    { label: "Chinese", number: "+855 (0)96 866 8508" }
+    // { label: "Chinese", number: "+855 (0)96 866 8508" }
   ],
   email: "info@dagrand.net",
   linkedin: "https://kh.linkedin.com/company/dagrand-law-office",
