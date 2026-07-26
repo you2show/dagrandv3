@@ -101,7 +101,7 @@ export const TEAM_MEMBERS: TeamMember[] = [
     languages: "Khmer, English and French",
     languages_cn: "高棉语、英语和法语",
     bio: [
-      "CHAN Sokyana is a Cambodian lawyer and Partner of Dagrand Law Office. He specializes in corporate and commercial cases, investment, capital market, tax and dispute resolution. He is a member of the National Committee of Cambodia ASEAN Law Association (NCCALA), and a law lecturer at the Royal University of Law and Economics in Phnom Penh, Cambodia. He has provided legal assistance to various clients, both local and multinational companies.",
+      "CHAN Sokyana is a Cambodian lawyer and Partner of Dagrand Law Office. He specializes in corporate and commercial cases, investment, capital market, tax and dispute resolution. He has been a member of the National Committee of Cambodia ASEAN Law Association (NCCALA), and he is currently a law lecturer at the Royal University of Law and Economics in Phnom Penh, Cambodia. He has provided legal assistance to various clients, both local and multinational companies.",
       "With a strong academic foundation, CHAN Sokyana completed the pre-doctoral preparation program at Sciences Po in Paris, earned a Master’s degree in Economic Law from Sciences Po in Paris, and graduated with the top ranking with a Bachelor of Laws from the Royal University of Law and Economics in Phnom Penh."
     ],
     bio_cn: [
@@ -116,28 +116,28 @@ export const TEAM_MEMBERS: TeamMember[] = [
     },
     image: "/assets/images/chan-sokyana.jfif"
   },
-  {
-    name: "MR. FU TIANXIN",
-    role: "Legal Consultant",
-    role_cn: "法律顾问",
-    languages: "Chinese, English and Spanish",
-    languages_cn: "中文、英语和西班牙语",
-    bio: [
-      "As a Chinese lawyer, FU Tianxin is a legal consultant at Dagrand Law Office. He has extensive experience in providing legal services in Cambodia and other ASEAN countries. His main practice areas are overseas investment by Chinese enterprises, real estate development in Cambodia, energy, trade remedies and dispute resolution. He has provided legal assistance to various clients, both local and multinational companies.",
-      "FU Tianxin holds a Master’s degree in International Economic Law from the University of International Business and Economics."
-    ],
-    bio_cn: [
-      "傅天信，中国律师，担任达观律师事务所的法律顾问。他在为来自柬埔寨及其他东盟国家的客户提供法律服务方面拥有丰富经验。",
-      "他曾为众多本地和跨国公司提供法律服务，主要执业领域为中国企业海外投资、柬埔寨房地产开发、能源、贸易救济及争议解决。",
-      "傅天信硕士毕业于对外经济贸易大学，获国际经济法硕士学位。"
-    ],
-    education: "Master’s degree in International Economic Law",
-    contact: {
-      phone: "+855 (0)96 866 8508",
-      email: "tianxin.fu@dagrand.net"
-    },
-    image: "/assets/images/fu-tianxin.jpg"
-  }
+  // {
+  //   name: "MR. FU TIANXIN",
+  //   role: "Legal Consultant",
+  //   role_cn: "法律顾问",
+  //   languages: "Chinese, English and Spanish",
+  //   languages_cn: "中文、英语和西班牙语",
+  //   bio: [
+  //     "As a Chinese lawyer, FU Tianxin is a legal consultant at Dagrand Law Office. He has extensive experience in providing legal services in Cambodia and other ASEAN countries. His main practice areas are overseas investment by Chinese enterprises, real estate development in Cambodia, energy, trade remedies and dispute resolution. He has provided legal assistance to various clients, both local and multinational companies.",
+  //     "FU Tianxin holds a Master’s degree in International Economic Law from the University of International Business and Economics."
+  //   ],
+  //   bio_cn: [
+  //     "傅天信，中国律师，担任达观律师事务所的法律顾问。他在为来自柬埔寨及其他东盟国家的客户提供法律服务方面拥有丰富经验。",
+  //     "他曾为众多本地和跨国公司提供法律服务，主要执业领域为中国企业海外投资、柬埔寨房地产开发、能源、贸易救济及争议解决。",
+  //     "傅天信硕士毕业于对外经济贸易大学，获国际经济法硕士学位。"
+  //   ],
+  //   education: "Master’s degree in International Economic Law",
+  //   contact: {
+  //     phone: "+855 (0)96 866 8508",
+  //     email: "tianxin.fu@dagrand.net"
+  //   },
+  //   image: "/assets/images/fu-tianxin.jpg"
+  // }
 ];
 
 export const PRACTICE_AREAS: PracticeArea[] = [
@@ -368,7 +368,7 @@ export const CONTACT_INFO = {
   businessHours_cn: "周一至周五，上午9点至下午5点",
   phones: [
     { label: "Khmer, English and French", number: "+855 (0)98 539 910" },
-    { label: "Chinese", number: "+855 (0)96 866 8508" }
+    // { label: "Chinese", number: "+855 (0)96 866 8508" }
   ],
   email: "info@dagrand.net",
   linkedin: "https://kh.linkedin.com/company/dagrand-law-office",
